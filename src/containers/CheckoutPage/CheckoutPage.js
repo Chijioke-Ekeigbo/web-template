@@ -40,6 +40,7 @@ import {
   sendMessage,
   initiateInquiryWithoutPayment,
   createFlutterwaveCheckoutSession,
+  verifyFlutterwavePaymentAction,
 } from './CheckoutPage.duck';
 
 import CheckoutPageWithPayment, { loadInitialDataForPayments } from './CheckoutPageWithPayment';
@@ -239,6 +240,7 @@ const mapDispatchToProps = dispatch => ({
   onSendMessage: params => dispatch(sendMessage(params)),
   onCreateFlutterwaveCheckout: transactionId =>
     dispatch(createFlutterwaveCheckoutSession(transactionId)),
+  onVerifyPayment: id => dispatch(verifyFlutterwavePaymentAction(id)),
 });
 
 const CheckoutPage = compose(

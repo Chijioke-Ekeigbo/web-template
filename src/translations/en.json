@@ -81,6 +81,7 @@
   "CheckoutPage.listingTitle": "{listingTitle}",
   "CheckoutPage.notEnoughStockMessage": "Unfortunately, you can't complete your order. There's not enough stock left.",
   "CheckoutPage.paymentExpiredMessage": "Payment was not completed in 15 minutes. Please go back to {listingLink} and try again.",
+  "CheckoutPage.paymentPendingMessage": "Your payment is currently being processed. Please be patient and refresh the page after a few moments to check if the payment was successful.",
   "CheckoutPage.providerCommissionBiggerThanMinPrice": "This listing is currently unavailable. Please contact support.",
   "CheckoutPage.providerInfo": "{name}",
   "CheckoutPage.providerStripeAccountMissingError": "This listing is currently unavailable because the listing author hasn't added their payout details yet. Please contact support.",

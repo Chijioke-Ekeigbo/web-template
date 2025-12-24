@@ -4,6 +4,7 @@ import {
   initiatePrivileged,
   transitionPrivileged,
   createFlutterwaveCheckout,
+  verifyFlutterwavePayment,
 } from '../../util/api';
 import { denormalisedResponseEntities } from '../../util/data';
 import { storableError } from '../../util/errors';
@@ -421,6 +422,28 @@ export const createFlutterwaveCheckoutSession = transactionId => dispatch => {
   return dispatch(createFlutterwaveCheckoutSessionThunk({ transactionId })).unwrap();
 };
 
+////////////////////////////////
+// Verify Flutterwave Payment //
+////////////////////////////////
+const verifyFlutterwavePaymentPayloadCreator = ({ id }, { rejectWithValue }) => {
+  return verifyFlutterwavePayment(id)
+    .then(response => {
+      return response.data;
+    })
+    .catch(e => {
+      return rejectWithValue(storableError(e));
+    });
+};
+
+export const verifyFlutterwavePaymentThunk = createAsyncThunk(
+  'CheckoutPage/verifyFlutterwavePayment',
+  verifyFlutterwavePaymentPayloadCreator
+);
+
+export const verifyFlutterwavePaymentAction = id => dispatch => {
+  return dispatch(verifyFlutterwavePaymentThunk({ id })).unwrap();
+};
+
 // ================ Slice ================ //
 
 const initialState = {
@@ -437,6 +460,8 @@ const initialState = {
   initiateInquiryError: null,
   createFlutterwaveCheckoutSessionInProgress: false,
   createFlutterwaveCheckoutSessionError: null,
+  verifyFlutterwavePaymentInProgress: false,
+  verifyFlutterwavePaymentError: null,
 };
 
 const checkoutPageSlice = createSlice({
@@ -515,6 +540,18 @@ const checkoutPageSlice = createSlice({
       .addCase(createFlutterwaveCheckoutSessionThunk.rejected, (state, action) => {
         state.createFlutterwaveCheckoutSessionInProgress = false;
         state.createFlutterwaveCheckoutSessionError = action.payload;
+      })
+      // Verify Flutterwave Payment cases
+      .addCase(verifyFlutterwavePaymentThunk.pending, state => {
+        state.verifyFlutterwavePaymentInProgress = true;
+        state.verifyFlutterwavePaymentError = null;
+      })
+      .addCase(verifyFlutterwavePaymentThunk.fulfilled, state => {
+        state.verifyFlutterwavePaymentInProgress = false;
+      })
+      .addCase(verifyFlutterwavePaymentThunk.rejected, (state, action) => {
+        state.verifyFlutterwavePaymentInProgress = false;
+        state.verifyFlutterwavePaymentError = action.payload;
       });
   },
 });

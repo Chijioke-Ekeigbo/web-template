@@ -200,11 +200,19 @@ export const loadInitialDataForPayments = ({ pageData, fetchSpeculatedTransactio
   fetchSpeculatedTransactionIfNeeded(orderParams, pageData, fetchSpeculatedTransaction);
 };
 
-const handleSubmit = (values, process, props, submitting, setSubmitting) => {
+const handleSubmit = (
+  values,
+  process,
+  props,
+  submitting,
+  setSubmitting,
+  setConfirmationProcessed
+) => {
   if (submitting) {
     return;
   }
   setSubmitting(true);
+  setConfirmationProcessed(false);
 
   const {
     history,
@@ -301,6 +309,7 @@ const handleSubmit = (values, process, props, submitting, setSubmitting) => {
 export const CheckoutPageWithPayment = props => {
   const [submitting, setSubmitting] = useState(false);
   const [confirmationProcessed, setConfirmationProcessed] = useState(false);
+  const [paymentPending, setPaymentPending] = useState(false);
 
   const {
     scrollingDisabled,
@@ -324,47 +333,8 @@ export const CheckoutPageWithPayment = props => {
     onSubmitCallback,
     setPageData,
     sessionStorageKey,
+    onVerifyPayment,
   } = props;
-
-  useEffect(() => {
-    const params = new URLSearchParams(history.location.search);
-    const status = params.get('status');
-    const txRef = params.get('tx_ref');
-
-    if (status === 'successful' && txRef && !submitting && !confirmationProcessed) {
-      setSubmitting(true);
-      setConfirmationProcessed(true);
-
-      // Extract Sharetribe transaction ID from txRef
-      // txRef format: ${transactionId.uuid}-${timestamp}
-      const transactionId = tx.id;
-      const transitionName = process.transitions.CONFIRM_PAYMENT;
-      const alreadyConfirmed = tx?.attributes?.lastTransition === transitionName;
-      const confirmPaymentFn = alreadyConfirmed
-        ? Promise.resolve(tx)
-        : onConfirmPayment(transactionId, transitionName);
-      confirmPaymentFn
-        .then(order => {
-          persistTransaction(order, pageData, storeData, setPageData, sessionStorageKey);
-          const message = pageData?.orderData?.message;
-          if (message) {
-            return onSendMessage({ id: transactionId, message });
-          }
-        })
-        .then(() => {
-          history.push(
-            createResourceLocatorString('OrderDetailsPage', routeConfiguration, {
-              id: transactionId.uuid,
-            })
-          );
-          onSubmitCallback();
-        })
-        .catch(e => {
-          console.error('Payment confirmation failed', e);
-          setSubmitting(false);
-        });
-    }
-  }, [history.location.search, submitting, confirmationProcessed, pageData, props]);
 
   // Since the listing data is already given from the ListingPage
   // and stored to handle refreshes, it might not have the possible
@@ -386,8 +356,73 @@ export const CheckoutPageWithPayment = props => {
     existingTransaction?.attributes?.lineItems?.length > 0
       ? existingTransaction
       : speculatedTransaction;
+
+  const process = processName ? getProcess(processName) : null;
+
+  useEffect(() => {
+    const params = new URLSearchParams(history.location.search);
+    const status = params.get('status');
+    const txRef = params.get('tx_ref');
+    const flutterwaveTransactionId = params.get('transaction_id');
+
+    if (
+      status === 'successful' &&
+      txRef &&
+      flutterwaveTransactionId &&
+      !submitting &&
+      !confirmationProcessed &&
+      tx.id
+    ) {
+      setSubmitting(true);
+      setConfirmationProcessed(true);
+
+      onVerifyPayment(flutterwaveTransactionId)
+        .then(response => {
+          const flutterwaveStatus = response.status;
+
+          if (flutterwaveStatus === 'pending') {
+            setSubmitting(false);
+            setPaymentPending(true);
+            // We don't want to proceed with confirmation if it's pending
+            return Promise.reject({ name: 'PaymentPending' });
+          }
+
+          const transactionId = tx.id;
+          const transitionName = process.transitions.CONFIRM_PAYMENT;
+          const alreadyConfirmed = tx?.attributes?.lastTransition === transitionName;
+          const confirmPaymentFn = alreadyConfirmed
+            ? Promise.resolve(tx)
+            : onConfirmPayment(transactionId, transitionName);
+
+          return confirmPaymentFn;
+        })
+        .then(order => {
+          persistTransaction(order, pageData, storeData, setPageData, sessionStorageKey);
+          const message = pageData?.orderData?.message;
+          if (message) {
+            return onSendMessage({ id: tx.id, message });
+          }
+        })
+        .then(() => {
+          history.push(
+            createResourceLocatorString('OrderDetailsPage', routeConfiguration, {
+              id: tx.id.uuid,
+            })
+          );
+          onSubmitCallback();
+        })
+        .catch(e => {
+          if (e.name === 'PaymentPending') {
+            return;
+          }
+          console.error('Payment confirmation failed', e);
+          setSubmitting(false);
+          setPaymentPending(false);
+        });
+    }
+  }, [history.location.search, submitting, confirmationProcessed, pageData, props, tx.id, process]);
+
   const timeZone = listing?.attributes?.availabilityPlan?.timezone;
-  const transactionProcessAlias = listing?.attributes?.publicData?.transactionProcessAlias;
   const priceVariantName = tx.attributes.protectedData?.priceVariantName;
 
   const txBookingMaybe = tx?.booking?.id ? { booking: tx.booking, timeZone } : {};
@@ -409,7 +444,6 @@ export const CheckoutPageWithPayment = props => {
   const totalPrice =
     tx?.attributes?.lineItems?.length > 0 ? getFormattedTotalPrice(tx, intl) : null;
 
-  const process = processName ? getProcess(processName) : null;
   const transitions = process.transitions;
   const isPaymentExpired = hasPaymentExpired(existingTransaction, process, isClockInSync);
 
@@ -441,6 +475,12 @@ export const CheckoutPageWithPayment = props => {
     speculateTransactionError,
     listingLink
   );
+
+  const paymentPendingMessage = paymentPending ? (
+    <p className={css.orderError}>
+      <FormattedMessage id="CheckoutPage.paymentPendingMessage" />
+    </p>
+  ) : null;
 
   const isBooking = processName === BOOKING_PROCESS_NAME;
   const isPurchase = processName === PURCHASE_PROCESS_NAME;
@@ -494,14 +534,24 @@ export const CheckoutPageWithPayment = props => {
             {errorMessages.listingNotFoundErrorMessage}
             {errorMessages.speculateErrorMessage}
             {errorMessages.paymentExpiredMessage}
+            {paymentPendingMessage}
 
             {showPaymentForm ? (
               <PaymentForm
                 initialValues={initialValues}
                 className={css.paymentForm}
                 formId="CheckoutPagePaymentForm"
-                onSubmit={values => handleSubmit(values, process, props, submitting, setSubmitting)}
-                inProgress={submitting}
+                onSubmit={values =>
+                  handleSubmit(
+                    values,
+                    process,
+                    props,
+                    submitting,
+                    setSubmitting,
+                    setConfirmationProcessed
+                  )
+                }
+                inProgress={submitting || paymentPending}
                 initiateOrderError={initiateOrderError}
                 askShippingDetails={askShippingDetails}
                 listingLocation={listingLocation}

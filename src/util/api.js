@@ -170,3 +170,8 @@ export const getPayoutDetails = () => {
 export const getBanks = country => {
   return post('/api/banks', { country });
 };
+
+// Create Flutterwave checkout link
+export const createFlutterwaveCheckout = transactionId => {
+  return post('/api/payments/checkout-link', { transactionId });
+};

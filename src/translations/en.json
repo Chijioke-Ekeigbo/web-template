@@ -1415,5 +1415,15 @@
   "PayoutDetailsPage.title": "Payout details",
   "PayoutDetailsPage.heading": "Payout details",
   "PayoutDetailsPage.loadingData": "Loading data...",
-  "PayoutDetailsPage.submitButtonText": "Save payout details"
+  "PayoutDetailsPage.submitButtonText": "Save payout details",
+  "PaymentForm.locationUnknown": "Unknown location",
+  "PaymentForm.pickupDetailsTitle": "Pickup location",
+  "PaymentForm.locationDetailsTitle": "Location of the listing",
+  "PaymentForm.messageHeading": "Additional information",
+  "PaymentForm.messageLabel": "Is there something the listing owner should know? {messageOptionalText}",
+  "PaymentForm.messageOptionalText": "(optional)",
+  "PaymentForm.messagePlaceholder": "Hello {name}! You should know that…",
+  "PaymentForm.submitButtonText": "{isBooking, select, yes {Confirm booking request} other {Confirm and pay {totalPrice}}}",
+  "EditListingWizard.payoutModalLoadingData": "Loading data...",
+  "EditListingWizard.payoutModalSubmitButtonText": "Save payout details"
 }

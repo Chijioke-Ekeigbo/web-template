@@ -19,6 +19,7 @@ const deleteAccount = require('./api/delete-account');
 const payoutDetails = require('./api/payout-details');
 const banks = require('./api/banks');
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
+const payments = require('./api/payments');
 
 const { authenticateFacebook, authenticateFacebookCallback } = require('./api/auth/facebook');
 const { authenticateGoogle, authenticateGoogleCallback } = require('./api/auth/google');
@@ -86,4 +87,5 @@ router.get('/auth/google/callback', authenticateGoogleCallback);
 // Payout details endpoints
 router.use('/payout-details', payoutDetails);
 router.use('/banks', banks);
+router.use('/payments', payments);
 module.exports = router;

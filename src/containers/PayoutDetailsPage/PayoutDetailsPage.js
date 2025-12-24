@@ -83,10 +83,11 @@ export const PayoutDetailsPageComponent = props => {
   const savedCountry = subaccount ? subaccount.country : '';
   const savedAccountBank = subaccount ? subaccount.accountBank : '';
   const savedAccountNumber = subaccount ? subaccount.accountNumber : '';
-  const savedBusinessName = subaccount ? subaccount.businessName : '';
-  const savedBusinessNumber = subaccount
-    ? subaccount.businessNumber
+  const savedBusinessName = subaccount
+    ? subaccount.businessName
     : currentUser?.attributes?.profile?.displayName || '';
+
+  const savedBusinessNumber = subaccount ? subaccount.businessNumber : '';
 
   // Check if user has limited rights and set button titles accordingly
   const limitedRights = authScopes?.indexOf('user:limited') >= 0;

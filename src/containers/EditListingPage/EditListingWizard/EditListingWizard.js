@@ -41,8 +41,7 @@ import {
   Modal,
   NamedRedirect,
   Tabs,
-  StripeConnectAccountStatusBox,
-  StripeConnectAccountForm,
+  FlutterwaveSubaccountForm,
 } from '../../../components';
 
 // Import modules from this directory
@@ -64,9 +63,6 @@ const TABS_DETAILS_ONLY = [DETAILS];
 
 // Tabs are horizontal in small screens
 const MAX_HORIZONTAL_NAV_SCREEN_WIDTH = 1023;
-
-const STRIPE_ONBOARDING_RETURN_URL_SUCCESS = 'success';
-const STRIPE_ONBOARDING_RETURN_URL_FAILURE = 'failure';
 
 /**
  * Pick only allowed tabs for the given process and listing type configuration.
@@ -295,48 +291,6 @@ const scrollToTab = (tabPrefix, tabId) => {
   }
 };
 
-// Create return URL for the Stripe onboarding form
-const createReturnURL = (returnURLType, rootURL, routes, pathParams) => {
-  const path = createResourceLocatorString(
-    'EditListingStripeOnboardingPage',
-    routes,
-    { ...pathParams, returnURLType },
-    {}
-  );
-  const root = rootURL.replace(/\/$/, '');
-  return `${root}${path}`;
-};
-
-// Get attribute: stripeAccountData
-const getStripeAccountData = stripeAccount => stripeAccount.attributes.stripeAccountData || null;
-
-// Get last 4 digits of bank account returned in Stripe account
-const getBankAccountLast4Digits = stripeAccountData =>
-  stripeAccountData && stripeAccountData.external_accounts.data.length > 0
-    ? stripeAccountData.external_accounts.data[0].last4
-    : null;
-
-// Check if there's requirements on selected type: 'past_due', 'currently_due' etc.
-const hasRequirements = (stripeAccountData, requirementType) =>
-  stripeAccountData != null &&
-  stripeAccountData.requirements &&
-  Array.isArray(stripeAccountData.requirements[requirementType]) &&
-  stripeAccountData.requirements[requirementType].length > 0;
-
-// Redirect user to Stripe's hosted Connect account onboarding form
-const handleGetStripeConnectAccountLinkFn = (getLinkFn, commonParams) => type => () => {
-  getLinkFn({ type, ...commonParams })
-    .then(url => {
-      window.location.href = url;
-    })
-    .catch(err => console.error(err));
-};
-
-const RedirectToStripe = ({ redirectFn }) => {
-  useEffect(redirectFn('custom_account_verification'), []);
-  return <FormattedMessage id="EditListingWizard.redirectingToStripe" />;
-};
-
 const getListingTypeConfig = (listing, selectedListingType, config) => {
   const existingListingType = listing?.attributes?.publicData?.listingType;
   const validListingTypes = config.listing.listingTypes;
@@ -354,7 +308,7 @@ const getListingTypeConfig = (listing, selectedListingType, config) => {
 
 /**
  * EditListingWizard is a component that renders the tabs that update the different parts of the listing.
- * It also handles the payout details modal and the Stripe onboarding form if the listing is a new one.
+ * It also handles the payout details modal and the Flutterwave subaccount form if the listing is a new one.
  * TODO: turn this into a functional component
  *
  * @component
@@ -375,22 +329,14 @@ const getListingTypeConfig = (listing, selectedListingType, config) => {
  * @param {propTypes.error} [props.errors.updateListingError] - The error object for updateListing
  * @param {propTypes.error} [props.errors.showListingsError] - The error object for showListings
  * @param {propTypes.error} [props.errors.uploadImageError] - The upload image error object
- * @param {propTypes.error} [props.errors.createStripeAccountError] - The error object for createStripeAccount
  * @param {propTypes.error} [props.errors.addExceptionError] - The error object for addException
  * @param {propTypes.error} [props.errors.deleteExceptionError] - The error object for deleteException
  * @param {propTypes.error} [props.errors.setStockError] - The error object for setStock
  * @param {boolean} props.fetchInProgress - Whether the fetch is in progress
- * @param {boolean} props.getAccountLinkInProgress - Whether the get account link is in progress
  * @param {boolean} props.payoutDetailsSaveInProgress - Whether the payout details save is in progress
  * @param {boolean} props.payoutDetailsSaved - Whether the payout details saved is in progress
  * @param {Function} props.onPayoutDetailsChange - The on payout details change function
  * @param {Function} props.onPayoutDetailsSubmit - The on payout details submit function
- * @param {Function} props.onGetStripeConnectAccountLink - The get StripeConnectAccountLink function
- * @param {propTypes.error} [props.createStripeAccountError] - The error object for createStripeAccount (TODO: errors object contains this)
- * @param {propTypes.error} [props.updateStripeAccountError] - The error object for updateStripeAccount (TODO: errors object contains this)
- * @param {propTypes.error} [props.fetchStripeAccountError] - The error object for fetchStripeAccount
- * @param {propTypes.error} [props.stripeAccountError] - The error object for stripeAccount (TODO: errors object contains this)
- * @param {propTypes.error} [props.stripeAccountLinkError] - The error object for stripeAccountLink
  * @param {Function} props.onManageDisableScrolling - The on manage disable scrolling function
  * @param {intlShape} props.intl - The intl object
  * @returns {JSX.Element} EditListingWizard component
@@ -414,11 +360,6 @@ class EditListingWizard extends Component {
   }
 
   componentDidMount() {
-    const { stripeOnboardingReturnURL } = this.props;
-
-    if (stripeOnboardingReturnURL != null && !this.showPayoutDetails) {
-      this.setState({ showPayoutDetails: true });
-    }
     if (!this.mounted) {
       this.mounted = true;
     }
@@ -429,7 +370,7 @@ class EditListingWizard extends Component {
   }
 
   handlePublishListing(id) {
-    const { onPublishListingDraft, currentUser, stripeAccount, listing, config } = this.props;
+    const { onPublishListingDraft, currentUser, listing, config } = this.props;
     const processName = listing?.attributes?.publicData?.transactionProcessAlias.split('/')[0];
     const isInquiryProcess = processName === INQUIRY_PROCESS_NAME;
 
@@ -439,18 +380,10 @@ class EditListingWizard extends Component {
     // Customers can't purchase these listings - but it gives operator opportunity to discuss with providers who fail to do so.
     const isPayoutDetailsRequired = requirePayoutDetails(listingTypeConfig);
 
-    const stripeConnected = !!currentUser?.stripeAccount?.id;
-    const stripeAccountData = stripeConnected ? getStripeAccountData(stripeAccount) : null;
-    const stripeRequirementsMissing =
-      stripeAccount &&
-      (hasRequirements(stripeAccountData, 'past_due') ||
-        hasRequirements(stripeAccountData, 'currently_due'));
+    const flutterwaveConnected = !!currentUser?.attributes?.profile?.privateData
+      ?.flutterwaveSubaccount?.subaccountId;
 
-    if (
-      isInquiryProcess ||
-      !isPayoutDetailsRequired ||
-      (stripeConnected && !stripeRequirementsMissing)
-    ) {
+    if (isInquiryProcess || !isPayoutDetailsRequired || flutterwaveConnected) {
       onPublishListingDraft(id);
     } else {
       this.setState({
@@ -478,19 +411,12 @@ class EditListingWizard extends Component {
       payoutDetailsSaved,
       onManageDisableScrolling,
       onPayoutDetailsChange,
-      onGetStripeConnectAccountLink,
-      getAccountLinkInProgress,
-      createStripeAccountError,
-      updateStripeAccountError,
-      fetchStripeAccountError,
-      stripeAccountFetched,
-      stripeAccount,
-      stripeAccountError,
-      stripeAccountLinkError,
       currentUser,
       config,
       routeConfiguration,
       authScopes,
+      flutterwaveSubaccountFetched,
+      flutterwaveSubaccountError,
       ...rest
     } = this.props;
 
@@ -583,67 +509,26 @@ class EditListingWizard extends Component {
       return { name: 'EditListingPage', params: { ...params, tab } };
     };
 
-    const formDisabled = getAccountLinkInProgress;
     const ensuredCurrentUser = ensureCurrentUser(currentUser);
     const currentUserLoaded = !!ensuredCurrentUser.id;
-    const stripeConnected = currentUserLoaded && !!stripeAccount && !!stripeAccount.id;
+    const privateData = ensuredCurrentUser?.attributes?.profile?.privateData || {};
+    const flutterwaveSubaccount = privateData.flutterwaveSubaccount || {};
+    const flutterwaveConnected = !!flutterwaveSubaccount.subaccountId;
 
-    const rootURL = config.marketplaceRootURL;
-    const { returnURLType, ...pathParams } = params;
-    const successURL = createReturnURL(
-      STRIPE_ONBOARDING_RETURN_URL_SUCCESS,
-      rootURL,
-      routeConfiguration,
-      pathParams
-    );
-    const failureURL = createReturnURL(
-      STRIPE_ONBOARDING_RETURN_URL_FAILURE,
-      rootURL,
-      routeConfiguration,
-      pathParams
-    );
-
-    const accountId = stripeConnected ? stripeAccount.id : null;
-    const stripeAccountData = stripeConnected ? getStripeAccountData(stripeAccount) : null;
-
-    const requirementsMissing =
-      stripeAccount &&
-      (hasRequirements(stripeAccountData, 'past_due') ||
-        hasRequirements(stripeAccountData, 'currently_due'));
-
-    const savedCountry = stripeAccountData ? stripeAccountData.country : null;
-    const savedAccountType = stripeAccountData ? stripeAccountData.business_type : null;
+    const {
+      country: savedCountry,
+      accountBank: savedAccountBank,
+      accountNumber: savedAccountNumber,
+      businessName: savedBusinessName,
+      businessNumber: savedBusinessNumber,
+    } = flutterwaveSubaccount;
 
     const { marketplaceName } = config;
-    const payoutModalInfo = stripeAccountData ? (
+    const payoutModalInfo = flutterwaveConnected ? (
       <FormattedMessage id="EditListingWizard.payoutModalInfo" values={{ marketplaceName }} />
     ) : (
       <FormattedMessage id="EditListingWizard.payoutModalInfoNew" values={{ marketplaceName }} />
     );
-
-    const handleGetStripeConnectAccountLink = handleGetStripeConnectAccountLinkFn(
-      onGetStripeConnectAccountLink,
-      {
-        accountId,
-        successURL,
-        failureURL,
-      }
-    );
-
-    const returnedNormallyFromStripe = returnURLType === STRIPE_ONBOARDING_RETURN_URL_SUCCESS;
-    const returnedAbnormallyFromStripe = returnURLType === STRIPE_ONBOARDING_RETURN_URL_FAILURE;
-    const showVerificationNeeded = stripeConnected && requirementsMissing;
-
-    // Check if user has limited rights and set button titles accordingly
-    const limitedRights = authScopes?.indexOf('user:limited') >= 0;
-    const stripeButtonTitle = limitedRights
-      ? intl.formatMessage({ id: 'StripePayoutPage.submitButtonText' })
-      : null;
-
-    // Redirect from success URL to basic path for StripePayoutPage
-    if (returnedNormallyFromStripe && stripeConnected && !requirementsMissing) {
-      return <NamedRedirect name="EditListingPage" params={pathParams} />;
-    }
 
     return (
       <div className={classes}>
@@ -710,55 +595,30 @@ class EditListingWizard extends Component {
               <FormattedMessage id="EditListingWizard.payoutModalTitlePayoutPreferences" />
             </Heading>
             {!currentUserLoaded ? (
-              <FormattedMessage id="StripePayoutPage.loadingData" />
-            ) : returnedAbnormallyFromStripe && !stripeAccountLinkError ? (
-              <p className={css.modalMessage}>
-                <RedirectToStripe redirectFn={handleGetStripeConnectAccountLink} />
-              </p>
+              <FormattedMessage id="EditListingWizard.payoutModalLoadingData" />
             ) : (
               <>
                 <p className={css.modalMessage}>{payoutModalInfo}</p>
-                <StripeConnectAccountForm
-                  disabled={formDisabled}
+                <FlutterwaveSubaccountForm
+                  disabled={fetchInProgress}
                   inProgress={payoutDetailsSaveInProgress}
                   ready={payoutDetailsSaved}
                   currentUser={currentUser}
-                  stripeBankAccountLastDigits={getBankAccountLast4Digits(stripeAccountData)}
                   savedCountry={savedCountry}
-                  savedAccountType={savedAccountType}
+                  savedAccountBank={savedAccountBank}
+                  savedAccountNumber={savedAccountNumber}
+                  savedBusinessName={savedBusinessName}
+                  savedBusinessNumber={savedBusinessNumber}
                   submitButtonText={intl.formatMessage({
-                    id: 'StripePayoutPage.submitButtonText',
+                    id: 'EditListingWizard.payoutModalSubmitButtonText',
                   })}
-                  stripeAccountError={stripeAccountError}
-                  stripeAccountFetched={stripeAccountFetched}
-                  stripeAccountLinkError={stripeAccountLinkError}
+                  flutterwaveSubaccountError={flutterwaveSubaccountError}
+                  flutterwaveSubaccountFetched={flutterwaveSubaccountFetched}
                   onChange={onPayoutDetailsChange}
                   onSubmit={rest.onPayoutDetailsSubmit}
-                  stripeConnected={stripeConnected}
+                  flutterwaveConnected={flutterwaveConnected}
                   authScopes={authScopes}
-                >
-                  {stripeConnected && !returnedAbnormallyFromStripe && showVerificationNeeded ? (
-                    <StripeConnectAccountStatusBox
-                      type="verificationNeeded"
-                      inProgress={getAccountLinkInProgress}
-                      onGetStripeConnectAccountLink={handleGetStripeConnectAccountLink(
-                        'custom_account_verification'
-                      )}
-                      disabled={limitedRights}
-                      title={stripeButtonTitle}
-                    />
-                  ) : stripeConnected && savedCountry && !returnedAbnormallyFromStripe ? (
-                    <StripeConnectAccountStatusBox
-                      type="verificationSuccess"
-                      inProgress={getAccountLinkInProgress}
-                      disabled={payoutDetailsSaveInProgress || limitedRights}
-                      onGetStripeConnectAccountLink={handleGetStripeConnectAccountLink(
-                        'custom_account_update'
-                      )}
-                      title={stripeButtonTitle}
-                    />
-                  ) : null}
-                </StripeConnectAccountForm>
+                />
               </>
             )}
           </div>

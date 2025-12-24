@@ -7,6 +7,7 @@ import { useIntl } from 'react-intl';
 // Import contexts and util modules
 import { useConfiguration } from '../../context/configurationContext';
 import { useRouteConfiguration } from '../../context/routeConfigurationContext';
+import { pathByRouteName } from '../../util/routes';
 import { userDisplayNameAsString } from '../../util/data';
 import {
   NO_ACCESS_PAGE_INITIATE_TRANSACTIONS,
@@ -23,8 +24,6 @@ import { requireListingImage } from '../../util/configHelpers';
 
 // Import global thunk functions
 import { isScrollingDisabled } from '../../ducks/ui.duck';
-import { confirmCardPayment, retrievePaymentIntent } from '../../ducks/stripe.duck';
-import { savePaymentMethod } from '../../ducks/paymentMethods.duck';
 
 // Import shared components
 import { NamedRedirect, Page, TopbarSimplified } from '../../components';
@@ -37,15 +36,13 @@ import {
   initiateOrder,
   setInitialValues,
   speculateTransaction,
-  stripeCustomer,
   confirmPayment,
   sendMessage,
   initiateInquiryWithoutPayment,
+  createFlutterwaveCheckoutSession,
 } from './CheckoutPage.duck';
 
-import CheckoutPageWithPayment, {
-  loadInitialDataForStripePayments,
-} from './CheckoutPageWithPayment';
+import CheckoutPageWithPayment, { loadInitialDataForPayments } from './CheckoutPageWithPayment';
 import CheckoutPageWithInquiryProcess from './CheckoutPageWithInquiryProcess';
 
 const STORAGE_KEY = 'CheckoutPage';
@@ -73,14 +70,7 @@ const EnhancedCheckoutPage = props => {
   const history = useHistory();
 
   useEffect(() => {
-    const {
-      currentUser,
-      orderData,
-      listing,
-      transaction,
-      fetchSpeculatedTransaction,
-      fetchStripeCustomer,
-    } = props;
+    const { currentUser, orderData, listing, transaction, fetchSpeculatedTransaction } = props;
     const initialData = { orderData, listing, transaction };
     const data = handlePageData(initialData, STORAGE_KEY, history);
     setPageData(data || {});
@@ -90,11 +80,10 @@ const EnhancedCheckoutPage = props => {
     if (isUserAuthorized(currentUser)) {
       // This is for processes using payments with Stripe integration
       if (getProcessName(data) !== INQUIRY_PROCESS_NAME) {
-        // Fetch StripeCustomer and speculateTransition for transactions that include Stripe payments
-        loadInitialDataForStripePayments({
+        // Fetch speculateTransition for transactions that include payments
+        loadInitialDataForPayments({
           pageData: data || {},
           fetchSpeculatedTransaction,
-          fetchStripeCustomer,
           config,
         });
       }
@@ -211,7 +200,6 @@ const mapStateToProps = state => {
   const {
     listing,
     orderData,
-    stripeCustomerFetched,
     speculateTransactionInProgress,
     speculateTransactionError,
     speculatedTransaction,
@@ -222,11 +210,9 @@ const mapStateToProps = state => {
     confirmPaymentError,
   } = state.CheckoutPage;
   const { currentUser } = state.user;
-  const { confirmCardPaymentError, paymentIntent, retrievePaymentIntentError } = state.stripe;
   return {
     scrollingDisabled: isScrollingDisabled(state),
     currentUser,
-    stripeCustomerFetched,
     orderData,
     speculateTransactionInProgress,
     speculateTransactionError,
@@ -236,10 +222,7 @@ const mapStateToProps = state => {
     listing,
     initiateInquiryError,
     initiateOrderError,
-    confirmCardPaymentError,
     confirmPaymentError,
-    paymentIntent,
-    retrievePaymentIntentError,
   };
 };
 
@@ -247,18 +230,15 @@ const mapDispatchToProps = dispatch => ({
   dispatch,
   fetchSpeculatedTransaction: (params, processAlias, txId, transitionName, isPrivileged) =>
     dispatch(speculateTransaction(params, processAlias, txId, transitionName, isPrivileged)),
-  fetchStripeCustomer: () => dispatch(stripeCustomer()),
   onInquiryWithoutPayment: (params, processAlias, transitionName) =>
     dispatch(initiateInquiryWithoutPayment(params, processAlias, transitionName)),
   onInitiateOrder: (params, processAlias, transactionId, transitionName, isPrivileged) =>
     dispatch(initiateOrder(params, processAlias, transactionId, transitionName, isPrivileged)),
-  onRetrievePaymentIntent: params => dispatch(retrievePaymentIntent(params)),
-  onConfirmCardPayment: params => dispatch(confirmCardPayment(params)),
   onConfirmPayment: (transactionId, transitionName, transitionParams) =>
     dispatch(confirmPayment(transactionId, transitionName, transitionParams)),
   onSendMessage: params => dispatch(sendMessage(params)),
-  onSavePaymentMethod: (stripeCustomer, stripePaymentMethodId) =>
-    dispatch(savePaymentMethod(stripeCustomer, stripePaymentMethodId)),
+  onCreateFlutterwaveCheckout: transactionId =>
+    dispatch(createFlutterwaveCheckoutSession(transactionId)),
 });
 
 const CheckoutPage = compose(

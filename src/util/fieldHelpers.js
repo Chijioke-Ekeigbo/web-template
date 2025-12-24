@@ -10,7 +10,7 @@ import {
 import { SCHEMA_TYPE_MULTI_ENUM, SCHEMA_TYPE_TEXT, SCHEMA_TYPE_YOUTUBE } from './types';
 import appSettings from '../config/settings';
 
-const { stripeSupportedCurrencies, subUnitDivisors } = appSettings;
+const { stripeSupportedCurrencies, flutterwaveSupportedCurrencies, subUnitDivisors } = appSettings;
 
 const keyMapping = {
   userType: {
@@ -209,9 +209,10 @@ export const isValidCurrencyForTransactionProcess = (
 ) => {
   // booking and purchase processes use Stripe actions.
   const isStripeRelatedProcess =
-    isPurchaseProcessAlias(transactionProcessAlias) ||
     isBookingProcessAlias(transactionProcessAlias) ||
     isNegotiationProcessAlias(transactionProcessAlias);
+
+  const isFlutterwaveRelatedProcess = isPurchaseProcessAlias(transactionProcessAlias);
 
   // Determine if the listing currency is supported by Stripe
   const isStripeSupportedCurrency = stripeSupportedCurrencies.includes(listingCurrency);
@@ -219,6 +220,9 @@ export const isValidCurrencyForTransactionProcess = (
   if (paymentProcessor === 'stripe') {
     // If using Stripe, only return true if both process and currency are compatible with Stripe
     return isStripeRelatedProcess && isStripeSupportedCurrency;
+  } else if (paymentProcessor === 'flutterwave') {
+    const isFlutterwaveSupportedCurrency = flutterwaveSupportedCurrencies.includes(listingCurrency);
+    return isFlutterwaveRelatedProcess && isFlutterwaveSupportedCurrency;
   } else if (paymentProcessor === null) {
     // If payment processor is not specified, allow any non-stripe related process with valid subunits or Stripe-related processes with supported currency
     return (

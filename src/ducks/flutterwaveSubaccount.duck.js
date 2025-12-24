@@ -98,6 +98,33 @@ export const updateFlutterwaveSubaccount = params => dispatch => {
   return dispatch(updateFlutterwaveSubaccountThunk(params)).unwrap();
 };
 
+///////////////////////////
+// Fetch Flutterwave Subaccount //
+///////////////////////////
+const fetchFlutterwaveSubaccountPayloadCreator = async (
+  _,
+  { dispatch, extra: sdk, rejectWithValue }
+) => {
+  try {
+    const response = await getPayoutDetails();
+    const entities = denormalisedResponseEntities(response);
+    const [currentUser] = entities;
+    return currentUser?.attributes?.profile?.privateData?.flutterwaveSubaccount || {};
+  } catch (err) {
+    const e = storableError(err);
+    log.error(err, 'fetch-flutterwave-subaccount-failed');
+    return rejectWithValue(e);
+  }
+};
+export const fetchFlutterwaveSubaccountThunk = createAsyncThunk(
+  'flutterwaveSubaccount/fetchFlutterwaveSubaccount',
+  fetchFlutterwaveSubaccountPayloadCreator
+);
+// Backward compatible wrapper function
+export const fetchFlutterwaveSubaccount = () => dispatch => {
+  return dispatch(fetchFlutterwaveSubaccountThunk()).unwrap();
+};
+
 // ================ Slice ================ //
 
 const flutterwaveSubaccountSlice = createSlice({
@@ -178,6 +205,21 @@ const flutterwaveSubaccountSlice = createSlice({
         console.error(action.payload);
         state.updateSubaccountError = action.payload;
         state.updateSubaccountInProgress = false;
+      })
+      // Fetch Subaccount cases
+      .addCase(fetchFlutterwaveSubaccountThunk.pending, state => {
+        state.fetchSubaccountError = null;
+        state.fetchSubaccountInProgress = true;
+      })
+      .addCase(fetchFlutterwaveSubaccountThunk.fulfilled, (state, action) => {
+        state.fetchSubaccountInProgress = false;
+        state.subaccount = action.payload;
+        state.subaccountFetched = true;
+      })
+      .addCase(fetchFlutterwaveSubaccountThunk.rejected, (state, action) => {
+        console.error(action.payload);
+        state.fetchSubaccountError = action.payload;
+        state.fetchSubaccountInProgress = false;
       });
   },
 });

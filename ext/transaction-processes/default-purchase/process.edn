@@ -10,8 +10,7 @@
    :actions
    [{:name :action/update-protected-data}
     {:name :action/create-pending-stock-reservation}
-    {:name :action/privileged-set-line-items}
-    {:name :action/stripe-create-payment-intent}],
+    {:name :action/privileged-set-line-items}],
    :to :state/pending-payment}
   {:name :transition/request-payment-after-inquiry,
    :actor :actor.role/customer,
@@ -19,16 +18,13 @@
    :actions
    [{:name :action/update-protected-data}
     {:name :action/create-pending-stock-reservation}
-    {:name :action/privileged-set-line-items}
-    {:name :action/stripe-create-payment-intent}],
+    {:name :action/privileged-set-line-items}],
    :from :state/inquiry,
    :to :state/pending-payment}
   {:name :transition/confirm-payment,
    :actor :actor.role/customer,
    :actions
-   [{:name :action/accept-stock-reservation}
-    {:name :action/stripe-confirm-payment-intent}
-    {:name :action/stripe-capture-payment-intent}],
+   [{:name :action/accept-stock-reservation}],
    :from :state/pending-payment,
    :to :state/purchased}
   {:name :transition/expire-payment,
@@ -37,16 +33,14 @@
     [{:fn/timepoint [:time/first-entered-state :state/pending-payment]}
      {:fn/period ["PT15M"]}]},
    :actions
-   [{:name :action/calculate-full-refund}
-    {:name :action/stripe-refund-payment}
-    ;; Keep this action last in the list of actions for
+   [;; Keep this action last in the list of actions for
     ;; the transition
     {:name :action/decline-stock-reservation}],
    :from :state/pending-payment,
    :to :state/payment-expired}
   {:name :transition/mark-received-from-purchased,
    :actor :actor.role/customer,
-   :actions [{:name :action/stripe-create-payout}],
+   :actions [],
    :from :state/purchased,
    :to :state/received}
   {:name :transition/mark-delivered,
@@ -61,7 +55,7 @@
    :to :state/delivered}
   {:name :transition/mark-received,
    :actor :actor.role/customer,
-   :actions [{:name :action/stripe-create-payout}],
+   :actions [],
    :from :state/delivered,
    :to :state/received}
   {:name :transition/auto-mark-received,
@@ -69,7 +63,7 @@
    {:fn/plus
     [{:fn/timepoint [:time/first-entered-state :state/delivered]}
      {:fn/period ["P14D"]}]},
-   :actions [{:name :action/stripe-create-payout}],
+   :actions [],
    :from :state/delivered,
    :to :state/received}
   {:name :transition/dispute,
@@ -84,15 +78,13 @@
    :to :state/disputed}
   {:name :transition/mark-received-from-disputed,
    :actor :actor.role/operator,
-   :actions [{:name :action/stripe-create-payout}],
+   :actions [],
    :from :state/disputed,
    :to :state/received}
   {:name :transition/cancel,
    :actor :actor.role/operator,
    :actions
-   [{:name :action/calculate-full-refund}
-    {:name :action/stripe-refund-payment}
-    ;; Keep this action last in the list of actions for
+   [;; Keep this action last in the list of actions for
     ;; the transition
     {:name :action/cancel-stock-reservation}],
    :from :state/purchased,
@@ -103,9 +95,7 @@
     [{:fn/timepoint [:time/first-entered-state :state/purchased]}
      {:fn/period ["P14D"]}]},
    :actions
-   [{:name :action/calculate-full-refund}
-    {:name :action/stripe-refund-payment}
-    ;; Keep this action last in the list of actions for
+   [;; Keep this action last in the list of actions for
     ;; the transition
     {:name :action/cancel-stock-reservation}],
    :from :state/purchased,
@@ -113,9 +103,7 @@
   {:name :transition/cancel-from-disputed,
    :actor :actor.role/operator,
    :actions
-   [{:name :action/calculate-full-refund}
-    {:name :action/stripe-refund-payment}
-    ;; Keep this action last in the list of actions for
+   [;; Keep this action last in the list of actions for
     ;; the transition
     {:name :action/cancel-stock-reservation}],
    :from :state/disputed,
@@ -126,9 +114,7 @@
     [{:fn/timepoint [:time/first-entered-state :state/disputed]}
      {:fn/period ["P60D"]}]},
    :actions
-   [{:name :action/calculate-full-refund}
-    {:name :action/stripe-refund-payment}
-    ;; Keep this action last in the list of actions for
+   [;; Keep this action last in the list of actions for
     ;; the transition
     {:name :action/cancel-stock-reservation}],
    :from :state/disputed,

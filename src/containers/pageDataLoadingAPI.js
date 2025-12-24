@@ -23,6 +23,7 @@ import {
   loadData as TransactionPageLoader,
   setInitialValues as TransactionPageInitialValues,
 } from './TransactionPage/TransactionPage.duck';
+import { loadData as PayoutDetailsPageLoader } from './PayoutDetailsPage/PayoutDetailsPage.duck';
 
 const getPageDataLoadingAPI = () => {
   return {
@@ -76,6 +77,9 @@ const getPageDataLoadingAPI = () => {
     },
     StripePayoutPage: {
       loadData: StripePayoutPageLoader,
+    },
+    PayoutDetailsPage: {
+      loadData: PayoutDetailsPageLoader,
     },
     TermsOfServicePage: {
       loadData: TermsOfServicePageLoader,

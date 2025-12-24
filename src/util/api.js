@@ -151,3 +151,22 @@ export const createUserWithIdp = body => {
 export const deleteUserAccount = body => {
   return post('/api/delete-account', body);
 };
+
+// Create payout details
+export const createPayoutDetails = body => {
+  return post('/api/payout-details/create', body);
+};
+
+// Update payout details
+export const updatePayoutDetails = body => {
+  return post('/api/payout-details/update', body);
+};
+
+// Get payout details
+export const getPayoutDetails = () => {
+  return post('/api/payout-details');
+};
+
+export const getBanks = country => {
+  return post('/api/banks', { country });
+};

@@ -16,7 +16,8 @@ const transactionLineItems = require('./api/transaction-line-items');
 const initiatePrivileged = require('./api/initiate-privileged');
 const transitionPrivileged = require('./api/transition-privileged');
 const deleteAccount = require('./api/delete-account');
-
+const payoutDetails = require('./api/payout-details');
+const banks = require('./api/banks');
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
 
 const { authenticateFacebook, authenticateFacebookCallback } = require('./api/auth/facebook');
@@ -82,4 +83,7 @@ router.get('/auth/google', authenticateGoogle);
 // loginWithIdp endpoint in Sharetribe Auth API to authenticate user to the marketplace
 router.get('/auth/google/callback', authenticateGoogleCallback);
 
+// Payout details endpoints
+router.use('/payout-details', payoutDetails);
+router.use('/banks', banks);
 module.exports = router;

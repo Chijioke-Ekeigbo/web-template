@@ -1,0 +1,93 @@
+.root {
+  position: relative;
+}
+
+.inputWrapper {
+  position: relative;
+}
+
+.input {
+  /* Dimensions */
+  display: block;
+  width: 100%;
+  margin: 0;
+
+  /* Consistent with marketplaceDefaults.css */
+  padding: 6px 12px 4px 12px;
+  background-color: var(--colorWhite);
+
+  /* Borders */
+  border-radius: 6px;
+  border: 1px solid #d8dce6;
+  outline: none;
+
+  /* Transition */
+  transition: all ease-in-out 100ms;
+
+  @media (--viewportMedium) {
+    padding: 7px 16px 7px 16px;
+    line-height: 32px;
+  }
+}
+
+.input:hover {
+  border: 1px solid #b8bfd1;
+}
+
+.input:focus {
+  background-color: var(--colorWhite);
+  border-color: #80bdff;
+  box-shadow: 0 0 0 0.2rem rgb(0 123 255 / 25%);
+}
+
+.inputError {
+  border-color: var(--colorFail);
+}
+
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: var(--colorWhite);
+  border: 1px solid var(--colorGrey200);
+  border-radius: var(--borderRadiusMedium);
+  box-shadow: var(--boxShadowPopup);
+  z-index: var(--zIndexPopup);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.dropdownList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dropdownItem {
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--colorGrey100);
+  transition: background-color 0.1s ease-in-out;
+}
+
+.dropdownItem:last-child {
+  border-bottom: none;
+}
+
+.dropdownItem:hover,
+.highlighted {
+  background-color: var(--colorGrey50);
+}
+
+.bankName {
+  composes: marketplaceBodyFontStyles from global;
+  font-weight: var(--fontWeightMedium);
+  margin: 0;
+}
+
+.bankCode {
+  composes: textSmall from global;
+  color: var(--colorGrey400);
+}

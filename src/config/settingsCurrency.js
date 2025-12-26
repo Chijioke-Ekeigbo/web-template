@@ -22,6 +22,8 @@ export const stripeSupportedCurrencies = [
   'USD',
 ];
 
+export const flutterwaveSupportedCurrencies = ['NGN', 'USD', 'EUR', 'GBP', 'CAD', 'AUD', 'NZD'];
+
 // Note: This template is designed to support currencies with subunit divisors of 100 or smaller.
 // While currencies with larger subunit divisors (e.g., 1000, such as the Iraqi Dinar) could be supported,
 // they are not currently compatible with the existing email templates, which assume a divisor of 100.

@@ -13,6 +13,7 @@ import marketplaceData from './marketplaceData.duck';
 import paymentMethods from './paymentMethods.duck';
 import stripe from './stripe.duck';
 import stripeConnectAccount from './stripeConnectAccount.duck';
+import flutterwaveSubaccount from './flutterwaveSubaccount.duck';
 import user from './user.duck';
 
 export {
@@ -25,5 +26,6 @@ export {
   paymentMethods,
   stripe,
   stripeConnectAccount,
+  flutterwaveSubaccount,
   user,
 };

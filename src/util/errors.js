@@ -364,7 +364,7 @@ export const isStripeDeletionFailedNonZeroBalance = error => {
 
 export const storableError = err => {
   const error = err || {};
-  const { name, message, status, statusText } = error;
+  const { name, message, status, statusText, data } = error;
   // Status, statusText, and data.errors are (possibly) added to the error object by SDK
   const apiErrors = responseAPIErrors(error);
 
@@ -376,5 +376,6 @@ export const storableError = err => {
     status,
     statusText,
     apiErrors,
+    data,
   };
 };

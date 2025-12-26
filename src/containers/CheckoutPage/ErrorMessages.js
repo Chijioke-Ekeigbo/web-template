@@ -21,7 +21,6 @@ export const getErrorMessages = (
   listingNotFound,
   initiateOrderError,
   isPaymentExpired,
-  retrievePaymentIntentError,
   speculateTransactionError,
   listingLink
 ) => {
@@ -52,24 +51,6 @@ export const getErrorMessages = (
     initiateOrderErrorMessage = <FormattedMessage id="CheckoutPage.notEnoughStockMessage" />;
   } else if (isChargeDisabledError) {
     initiateOrderErrorMessage = <FormattedMessage id="CheckoutPage.chargeDisabledMessage" />;
-  } else if (stripeErrors && stripeErrors.length > 0) {
-    const noAccountMsg =
-      'Your destination account needs to have at least one of the following capabilities enabled';
-    if (stripeErrors.length === 1 && stripeErrors[0].indexOf(noAccountMsg) > -1) {
-      initiateOrderErrorMessage = (
-        <FormattedMessage id="CheckoutPage.destinationAccountNotCompleteStripeError" />
-      );
-    } else {
-      // NOTE: Error messages from Stripes are not part of translations.
-      // By default they are in English.
-      const stripeErrorsAsString = stripeErrors.join(', ');
-      initiateOrderErrorMessage = (
-        <FormattedMessage
-          id="CheckoutPage.initiateOrderStripeError"
-          values={{ stripeErrors: stripeErrorsAsString }}
-        />
-      );
-    }
   } else if (isTooManyRequestsError(initiateOrderError)) {
     // 429 Too Many Requests
     initiateOrderErrorMessage = <FormattedMessage id="CheckoutPage.tooManyRequestsError" />;
@@ -125,17 +106,6 @@ export const getErrorMessages = (
       </p>
     ) : null;
 
-  // Stripe might throw error when retrieving payment intent
-  const retrievePaymentIntentErrorMessageParagraph = retrievePaymentIntentError ? (
-    <p className={css.orderError}>
-      <FormattedMessage
-        id="CheckoutPage.retrievingStripePaymentIntentFailed"
-        values={{ listingLink }}
-      />
-    </p>
-  ) : null;
-
-  // Stripe related processes have payment expiration (15 min time-window to confirm the payment)
   const paymentExpiredMessageParagraph = isPaymentExpired ? (
     <p className={css.orderError}>
       <FormattedMessage id="CheckoutPage.paymentExpiredMessage" values={{ listingLink }} />
@@ -146,7 +116,6 @@ export const getErrorMessages = (
     listingNotFoundErrorMessage: listingNotFoundErrorMessageParagraph,
     initiateOrderErrorMessage: initiateOrderErrorMessageParagraph,
     paymentExpiredMessage: paymentExpiredMessageParagraph,
-    retrievePaymentIntentErrorMessage: retrievePaymentIntentErrorMessageParagraph,
     speculateErrorMessage: speculateErrorMessageParagraph,
     speculateTransactionErrorMessage: speculateTransactionErrorMessageParagraph,
   };

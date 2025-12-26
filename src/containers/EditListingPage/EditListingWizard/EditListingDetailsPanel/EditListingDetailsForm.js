@@ -357,7 +357,8 @@ const EditListingDetailsForm = props => (
       // and the marketplace or listing currency.
       const isCompatibleCurrency = isValidCurrencyForTransactionProcess(
         transactionProcessAlias,
-        currencyToCheck
+        currencyToCheck,
+        'flutterwave'
       );
 
       const maxLength60Message = maxLength(maxLengthMessage, TITLE_MAX_LENGTH);

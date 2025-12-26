@@ -20,6 +20,7 @@ const MISSING_INFORMATION_MODAL_WHITELIST = [
   'EmailVerificationPage',
   'PasswordResetPage',
   'StripePayoutPage',
+  'PayoutDetailsPage',
 ];
 
 const EMAIL_VERIFICATION = 'EMAIL_VERIFICATION';

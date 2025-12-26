@@ -106,12 +106,12 @@ const EditListingPricingAndStockPanel = props => {
 
   // Don't render the form if the assigned currency is different from the marketplace currency
   // or if transaction process is incompatible with selected currency
-  const isStripeCompatibleCurrency = isValidCurrencyForTransactionProcess(
+  const isCompatibleCurrency = isValidCurrencyForTransactionProcess(
     transactionProcessAlias,
     marketplaceCurrency,
-    'stripe'
+    'flutterwave'
   );
-  const priceCurrencyValid = !isStripeCompatibleCurrency
+  const priceCurrencyValid = !isCompatibleCurrency
     ? false
     : marketplaceCurrency && initialValues.price instanceof Money
     ? initialValues.price?.currency === marketplaceCurrency

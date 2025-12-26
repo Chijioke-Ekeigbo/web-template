@@ -1,13 +1,43 @@
 const cron = require('node-cron');
-const { getFlutterwaveApi } = require('./flutterwaveSdk');
-const { getIntegrationSdk } = require('./sdk');
-const { denormalisedResponseEntities } = require('./format');
+const { getFlutterwaveApi } = require('../api-util/flutterwaveSdk');
+const { getIntegrationSdk } = require('../api-util/sdk');
+const { denormalisedResponseEntities } = require('../api-util/format');
+
+const fromToday = new Date('2025-12-26T07:14:00Z');
+const PER_PAGE = 100;
+const queryAllPagesTransactions = async integrationSdk => {
+  let page = 1;
+  let totalPages = 1;
+  const transactions = [];
+  do {
+    const txResponse = await integrationSdk.transactions.query({
+      states: ['state/completed'],
+      createdAtStart: fromToday.toISOString(),
+      page,
+      perPage: PER_PAGE,
+      meta_transferred: false,
+      include: ['provider'],
+    });
+    const newTransactions = denormalisedResponseEntities(txResponse);
+    transactions.push(...newTransactions);
+    totalPages = txResponse.data.meta.totalPages;
+    page++;
+  } while (page <= totalPages);
+
+  return transactions;
+};
 
 /**
  * Worker to process payouts for completed transactions via Flutterwave.
  */
-const fromToday = new Date('2025-12-25T15:40:00Z');
+let isProcessing = false;
 const processPayouts = async () => {
+  if (isProcessing) {
+    console.log('PayoutWorker: Job is already running. Skipping this run.');
+    return;
+  }
+
+  isProcessing = true;
   console.log('PayoutWorker: Checking for completed transactions needing payout...');
   console.log('--------------------------------------------------');
 
@@ -17,30 +47,14 @@ const processPayouts = async () => {
 
     // 1. Query completed transactions
     // We filter for transactions in 'state/completed' that don't have a transferId in metadata
-    const txResponse = await integrationSdk.transactions.query({
-      states: ['state/completed'],
-      include: ['provider'],
-      // We'll filter for those without transferId manually in the code
-      // as metadata filtering in query is limited.
-      createdAtStart: fromToday.toISOString(),
-    });
-
-    const transactions = denormalisedResponseEntities(txResponse);
-
+    const transactions = await queryAllPagesTransactions(integrationSdk);
     // Filter for transactions that haven't been processed yet or have failed
     const pendingPayouts = transactions
-      .filter(tx => {
-        const metadata = tx.attributes.metadata;
-        const hasNoTransfer = !metadata?.transferId;
-        const isFailed = metadata?.transferStatus === 'FAILED';
-        return hasNoTransfer || isFailed;
-      })
       // Sort oldest to newest based on last transition
       .sort(
         (a, b) =>
           new Date(a.attributes.lastTransitionedAt) - new Date(b.attributes.lastTransitionedAt)
       );
-
     if (pendingPayouts.length === 0) {
       console.log('PayoutWorker: No pending payouts found.');
       console.log('--------------------------------------------------');
@@ -59,16 +73,25 @@ const processPayouts = async () => {
       const amount = payoutTotal.amount / 100; // Flutterwave major units
       const metadata = tx.attributes.metadata || {};
       const existingTransferId = metadata.transferId;
-      const isRetry = existingTransferId && metadata.transferStatus !== 'SUCCESSFUL';
-
-      console.log(
-        `PayoutWorker: Processing ${
-          isRetry ? 'retry' : 'payout'
-        } for transaction ${txId} (${amount} ${currency})`
-      );
-      console.log('');
-
+      let isRetry = false;
       try {
+        if (existingTransferId) {
+          const lastestTransferData = await flutterwaveApi.get(`/transfers/${existingTransferId}`);
+          const lastestTransferStatus = lastestTransferData.data.data.status;
+          if (lastestTransferStatus === 'SUCCESSFUL' || lastestTransferStatus === 'PENDING') {
+            console.log(`PayoutWorker: Transfer ${existingTransferId} is already processed.`);
+            console.log('');
+
+            await integrationSdk.transactions.updateMetadata({
+              id: tx.id,
+              metadata: { transferStatus: lastestTransferStatus, transferred: true },
+            });
+
+            continue;
+          }
+          isRetry = lastestTransferStatus === 'FAILED';
+        }
+
         // a. Check Flutterwave balance for this currency
         const { data: balanceResponse } = await flutterwaveApi.get(`/balances/${currency}`);
         const availableBalance = balanceResponse.data.available_balance;
@@ -104,9 +127,11 @@ const processPayouts = async () => {
             amount: amount,
             currency: currency,
             narration: `Payout for transaction ${txId}`,
-            reference: `payout_${txId}_${Date.now()}`,
             callback_url: `${process.env.REACT_APP_MARKETPLACE_ROOT_URL}/api/payments/payout-webhook`,
             debit_currency: currency,
+            //this would help there is no duplicate payout for the same transaction
+            //if payout is already initiated, it will be skipped
+            reference: `payout_${txId}`,
           };
 
           transferResponse = await flutterwaveApi.post('/transfers', transferPayload, {});
@@ -169,6 +194,8 @@ const processPayouts = async () => {
   } catch (error) {
     console.error('PayoutWorker: Critical error in payout process:', error.message);
     console.error('--------------------------------------------------');
+  } finally {
+    isProcessing = false;
   }
 };
 
@@ -179,9 +206,6 @@ const processPayouts = async () => {
 const startPayoutWorker = (cronExpression = '0 * * * *') => {
   console.log(`PayoutWorker: Starting payout worker (schedule: ${cronExpression})`);
   console.log('--------------------------------------------------');
-
-  // Run immediately on start (optional, but usually helpful for development/debugging)
-  processPayouts();
 
   // Schedule subsequent runs using node-cron
   cron.schedule(cronExpression, () => {

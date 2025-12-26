@@ -539,6 +539,7 @@ export const CheckoutPageWithPayment = props => {
             {showPaymentForm ? (
               <PaymentForm
                 initialValues={initialValues}
+                keepDirtyOnReinitialize={true}
                 className={css.paymentForm}
                 formId="CheckoutPagePaymentForm"
                 onSubmit={values =>

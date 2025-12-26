@@ -73,7 +73,6 @@ const createCheckout = async (req, res) => {
     const flutterwaveApi = getFlutterwaveApi();
     const txRef = `${transactionId.uuid}_${new Date().getTime()}`;
 
-    // Minimum commission is preferred if it is greated than the estimated transaction amount
     const payload = {
       tx_ref: txRef,
       amount,

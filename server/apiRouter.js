@@ -23,8 +23,8 @@ const payments = require('./api/payments');
 
 const { authenticateFacebook, authenticateFacebookCallback } = require('./api/auth/facebook');
 const { authenticateGoogle, authenticateGoogleCallback } = require('./api/auth/google');
-const { startPayoutWorker } = require('./api-util/payoutJob');
-const { startRefundWorker } = require('./api-util/refundJob');
+const { startPayoutWorker } = require('./jobs/payoutJob');
+const { startRefundWorker } = require('./jobs/refundJob');
 
 const router = express.Router();
 
@@ -91,9 +91,20 @@ router.use('/payout-details', payoutDetails);
 router.use('/banks', banks);
 router.use('/payments', payments);
 
-//run every hour
-startPayoutWorker('* * * * *');
-//run every minutes
-startRefundWorker('* * * * *');
+setTimeout(() => {
+  // Run payout and refund jobs with configurable intervals
+  const PAYOUT_JOB_INTERVAL_MINUTE = process.env.PAYOUT_JOB_INTERVAL_MINUTE
+    ? parseInt(process.env.PAYOUT_JOB_INTERVAL_MINUTE)
+    : 60; // Default to every 60 minutes
+  const REFUND_JOB_INTERVAL_MINUTE = process.env.REFUND_JOB_INTERVAL_MINUTE
+    ? parseInt(process.env.REFUND_JOB_INTERVAL_MINUTE)
+    : 15; // Default to every 15 minutes
+
+  const PAYOUT_SCHEDULE = `*/${PAYOUT_JOB_INTERVAL_MINUTE} * * * *`;
+  const REFUND_SCHEDULE = `*/${REFUND_JOB_INTERVAL_MINUTE} * * * *`;
+
+  startPayoutWorker(PAYOUT_SCHEDULE);
+  startRefundWorker(REFUND_SCHEDULE);
+}, 10000);
 
 module.exports = router;

@@ -216,6 +216,10 @@ const UpdateFlutterwaveSubaccountFields = props => {
 const ErrorsMaybe = props => {
   const { flutterwaveSubaccountError } = props;
 
+  if (flutterwaveSubaccountError?.data?.message) {
+    return <div className={css.error}>{flutterwaveSubaccountError.data.message}</div>;
+  }
+
   const errorMessage = flutterwaveSubaccountError ? (
     <FormattedMessage id="FlutterwaveSubaccountForm.createSubaccountFailed" />
   ) : null;

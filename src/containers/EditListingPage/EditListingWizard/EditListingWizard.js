@@ -416,6 +416,7 @@ class EditListingWizard extends Component {
       authScopes,
       subaccountFetched,
       flutterwaveSubaccountError,
+      createSubaccountError,
       ...rest
     } = this.props;
 
@@ -611,10 +612,23 @@ class EditListingWizard extends Component {
                   submitButtonText={intl.formatMessage({
                     id: 'EditListingWizard.payoutModalSubmitButtonText',
                   })}
-                  flutterwaveSubaccountError={flutterwaveSubaccountError}
+                  flutterwaveSubaccountError={createSubaccountError ?? flutterwaveSubaccountError}
                   flutterwaveSubaccountFetched={subaccountFetched}
                   onChange={onPayoutDetailsChange}
-                  onSubmit={rest.onPayoutDetailsSubmit}
+                  onSubmit={async values => {
+                    const response = await rest.onPayoutDetailsSubmit(values);
+                    console.log({ response });
+                    if (response.error) {
+                      return;
+                    }
+                    this.handlePayoutModalClose();
+                    const main = document.getElementsByTagName('main')?.[0];
+                    const submitButtons = main?.querySelectorAll('button[type="submit"]');
+                    const lastSubmitButton = submitButtons?.[submitButtons.length - 1];
+                    if (lastSubmitButton) {
+                      lastSubmitButton.focus();
+                    }
+                  }}
                   flutterwaveConnected={flutterwaveConnected}
                   authScopes={authScopes}
                 />

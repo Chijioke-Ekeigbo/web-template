@@ -135,6 +135,7 @@ export const EditListingPageComponent = props => {
     subaccountFetched,
     subaccount,
     authScopes,
+    createSubaccountError,
   } = props;
 
   const { id, type } = params;
@@ -280,6 +281,7 @@ export const EditListingPageComponent = props => {
           flutterwaveSubaccountError={page.payoutDetailsSaveError}
           authScopes={authScopes}
           titleId={titleId}
+          createSubaccountError={createSubaccountError}
         />
       </Page>
     );
@@ -307,7 +309,7 @@ const mapStateToProps = state => {
     fetchFlutterwaveSubaccountInProgress,
     fetchFlutterwaveSubaccountError,
     createFlutterwaveSubaccountInProgress,
-    createFlutterwaveSubaccountError,
+    createSubaccountError,
     updateFlutterwaveSubaccountError,
     subaccount,
     subaccountFetched,
@@ -329,6 +331,7 @@ const mapStateToProps = state => {
     page,
     scrollingDisabled: isScrollingDisabled(state),
     authScopes,
+    createSubaccountError,
   };
 };
 

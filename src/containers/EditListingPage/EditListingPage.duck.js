@@ -23,6 +23,7 @@ import {
   createFlutterwaveSubaccount,
   updateFlutterwaveSubaccount,
   fetchFlutterwaveSubaccount,
+  setFlutterwaveSubaccount,
 } from '../../ducks/flutterwaveSubaccount.duck';
 import { fetchCurrentUser } from '../../ducks/user.duck';
 
@@ -874,7 +875,11 @@ export const loadData = (params, search, config) => (dispatch, getState, sdk) =>
       .then(response => {
         const currentUser = getState().user.currentUser;
         if (currentUser && currentUser.attributes?.profile?.privateData?.flutterwaveSubaccount) {
-          dispatch(fetchFlutterwaveSubaccount());
+          dispatch(
+            setFlutterwaveSubaccount(
+              currentUser.attributes?.profile?.privateData?.flutterwaveSubaccount
+            )
+          );
         }
         return response;
       })
@@ -890,13 +895,15 @@ export const loadData = (params, search, config) => (dispatch, getState, sdk) =>
   ])
     .then(response => {
       const currentUser = getState().user.currentUser;
-
+      if (currentUser && currentUser.attributes?.profile?.privateData?.flutterwaveSubaccount) {
+        dispatch(
+          setFlutterwaveSubaccount(
+            currentUser.attributes?.profile?.privateData?.flutterwaveSubaccount
+          )
+        );
+      }
       // Do not fetch extra information if user is in pending-approval state.
       if (isUserAuthorized(currentUser)) {
-        if (currentUser && currentUser.attributes?.profile?.privateData?.flutterwaveSubaccount) {
-          dispatch(fetchFlutterwaveSubaccount());
-        }
-
         // Because of two dispatch functions, response is an array.
         // We are only interested in the response from requestShowListing here,
         // so we need to pick the first one

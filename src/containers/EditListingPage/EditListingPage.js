@@ -24,9 +24,7 @@ import { ensureOwnListing } from '../../util/data';
 import { hasPermissionToPostListings, isUserAuthorized } from '../../util/userHelpers';
 import { getMarketplaceEntities } from '../../ducks/marketplaceData.duck';
 import { manageDisableScrolling, isScrollingDisabled } from '../../ducks/ui.duck';
-import {
-  flutterwaveSubaccountClearError,
-} from '../../ducks/flutterwaveSubaccount.duck';
+import { flutterwaveSubaccountClearError } from '../../ducks/flutterwaveSubaccount.duck';
 
 // Import shared components
 import { NamedRedirect, Page } from '../../components';
@@ -277,7 +275,7 @@ export const EditListingPageComponent = props => {
           updateInProgress={page.updateInProgress || page.createListingDraftInProgress}
           payoutDetailsSaveInProgress={page.payoutDetailsSaveInProgress}
           payoutDetailsSaved={page.payoutDetailsSaved}
-          flutterwaveSubaccountFetched={subaccountFetched}
+          subaccountFetched={subaccountFetched}
           subaccount={subaccount}
           flutterwaveSubaccountError={page.payoutDetailsSaveError}
           authScopes={authScopes}
@@ -311,8 +309,8 @@ const mapStateToProps = state => {
     createFlutterwaveSubaccountInProgress,
     createFlutterwaveSubaccountError,
     updateFlutterwaveSubaccountError,
-    flutterwaveSubaccount,
-    flutterwaveSubaccountFetched,
+    subaccount,
+    subaccountFetched,
   } = state.flutterwaveSubaccount;
 
   const getOwnListing = id => {
@@ -323,8 +321,8 @@ const mapStateToProps = state => {
   const { authScopes } = state.auth;
 
   return {
-    subaccountFetched: flutterwaveSubaccountFetched,
-    subaccount: flutterwaveSubaccount,
+    subaccountFetched,
+    subaccount,
     currentUser: state.user.currentUser,
     fetchInProgress: createFlutterwaveSubaccountInProgress || fetchFlutterwaveSubaccountInProgress,
     getOwnListing,

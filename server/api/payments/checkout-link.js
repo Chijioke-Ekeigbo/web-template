@@ -7,6 +7,9 @@ const createSlugFromString = str => {
     .replace(/ /g, '-')
     .replace(/[^\w-]+/g, '');
 };
+
+const FIFTEEN_MINUTES_LATER = new Date(Date.now() + 15 * 60 * 1000);
+
 const createCheckout = async (req, res) => {
   try {
     const { transactionId } = req.body;
@@ -68,8 +71,9 @@ const createCheckout = async (req, res) => {
     const listingSlug = createSlugFromString(tx.listing.attributes.title);
     const listingId = tx.listing.id.uuid;
     const flutterwaveApi = getFlutterwaveApi();
-    const txRef = `${transactionId.uuid}-${new Date().getTime()}`;
+    const txRef = `${transactionId.uuid}_${new Date().getTime()}`;
 
+    // Minimum commission is preferred if it is greated than the estimated transaction amount
     const payload = {
       tx_ref: txRef,
       amount,
@@ -79,14 +83,16 @@ const createCheckout = async (req, res) => {
         email: req.currentUser.attributes.email,
         name: `${req.currentUser.attributes.profile.firstName} ${req.currentUser.attributes.profile.lastName}`,
       },
-      subaccounts: [
-        {
-          id: subaccountId,
-        },
-      ],
       customizations: {
         title: process.env.REACT_APP_MARKETPLACE_NAME || 'Marketplace Payment',
       },
+      link_expiration: FIFTEEN_MINUTES_LATER.toISOString(),
+      meta: [
+        {
+          meta_key: 'Sharetribe Transaction ID',
+          meta_value: transactionId.uuid,
+        },
+      ],
     };
 
     const response = await flutterwaveApi.post('/payments', payload);

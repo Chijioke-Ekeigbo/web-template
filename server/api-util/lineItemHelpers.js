@@ -21,7 +21,7 @@ const getNegation = numberValue => {
 };
 
 // Returns percentage applied to a given amount if applicable and valid, otherwise returns 0
-const calculateCommissionWithPercentage = (percentage, amount) => {
+exports.calculateCommissionWithPercentage = (percentage, amount) => {
   const hasValidAmountAndPercentage = amount != null && percentage != null && percentage > 0;
 
   if (hasValidAmountAndPercentage) {
@@ -355,7 +355,7 @@ exports.getProviderCommissionMaybe = (providerCommission, order, currency) => {
   // Calculate the total money paid into the transaction
   const totalMoneyIn = this.calculateTotalFromLineItems([order]);
   // Calculate the estimated commission with percentage applied, if applicable
-  const estimatedCommissionFromPercentage = calculateCommissionWithPercentage(
+  const estimatedCommissionFromPercentage = this.calculateCommissionWithPercentage(
     providerCommission?.percentage,
     totalMoneyIn.amount
   );
@@ -411,7 +411,7 @@ exports.getCustomerCommissionMaybe = (customerCommission, order, currency) => {
   // Calculate the total money paid into the transaction
   const totalMoneyIn = this.calculateTotalFromLineItems([order]);
   // Calculate the estimated commission with percentage applied, if applicable
-  const estimatedCommissionFromPercentage = calculateCommissionWithPercentage(
+  const estimatedCommissionFromPercentage = this.calculateCommissionWithPercentage(
     customerCommission?.percentage,
     totalMoneyIn.amount
   );

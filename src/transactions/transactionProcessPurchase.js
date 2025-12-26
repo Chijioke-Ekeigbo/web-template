@@ -29,6 +29,10 @@ export const transitions = {
   // to tell that the payment is confirmed.
   CONFIRM_PAYMENT: 'transition/confirm-payment',
 
+  // If the payment is confirmed via a webhook from a 3rd party payment provider (e.g. Flutterwave)
+  // we use this transition to confirm the payment on Sharetribe.
+  CONFIRM_PAYMENT_VIA_WEBHOOK: 'transition/confirm-payment-via-webhook',
+
   // If the payment is not confirmed in the time limit set in transaction process (by default 15min)
   // the transaction will expire automatically.
   EXPIRE_PAYMENT: 'transition/expire-payment',
@@ -144,6 +148,7 @@ export const graph = {
       on: {
         [transitions.EXPIRE_PAYMENT]: states.PAYMENT_EXPIRED,
         [transitions.CONFIRM_PAYMENT]: states.PURCHASED,
+        [transitions.CONFIRM_PAYMENT_VIA_WEBHOOK]: states.PURCHASED,
       },
     },
 
@@ -213,6 +218,7 @@ export const graph = {
 export const isRelevantPastTransition = transition => {
   return [
     transitions.CONFIRM_PAYMENT,
+    transitions.CONFIRM_PAYMENT_VIA_WEBHOOK,
     transitions.AUTO_CANCEL,
     transitions.CANCEL,
     transitions.MARK_DELIVERED,

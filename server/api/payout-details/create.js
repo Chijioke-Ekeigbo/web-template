@@ -1,5 +1,5 @@
 const { getFlutterwaveApi } = require('../../api-util/flutterwaveSdk');
-const { serialize, handleError, getSdk } = require('../../api-util/sdk');
+const { serialize, handleError, getSdk, fetchCommission } = require('../../api-util/sdk');
 
 const createPayoutDetails = async (req, res) => {
   const currentUser = req.currentUser;
@@ -31,6 +31,13 @@ const createPayoutDetails = async (req, res) => {
       throw error;
     }
 
+    const commission = await fetchCommission(sdk);
+
+    const commissionAsset = commission.data.data[0];
+
+    const { providerCommission } =
+      commissionAsset?.type === 'jsonAsset' ? commissionAsset.attributes.data : {};
+    const { percentage } = providerCommission;
     const payload = {
       account_bank: accountBank,
       account_number: accountNumber,
@@ -41,8 +48,8 @@ const createPayoutDetails = async (req, res) => {
       business_contact_mobile: businessContactMobile,
       business_mobile: businessMobile,
       business_number: businessNumber,
-      split_value: 10,
-      split_type: 'flat',
+      split_value: percentage / 100,
+      split_type: 'percentage',
       meta: [
         {
           meta_name: 'Sharetribe User Id',

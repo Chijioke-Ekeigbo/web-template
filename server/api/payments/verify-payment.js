@@ -1,5 +1,6 @@
 const { getFlutterwaveApi } = require('../../api-util/flutterwaveSdk');
-const { serialize, handleError } = require('../../api-util/sdk');
+const { denormalisedResponseEntities } = require('../../api-util/format');
+const { serialize, handleError, getIntegrationSdk } = require('../../api-util/sdk');
 
 /**
  * Verify Flutterwave transaction status.
@@ -19,8 +20,37 @@ const verifyPayment = async (req, res) => {
 
     const flutterwaveApi = getFlutterwaveApi();
     const response = await flutterwaveApi.get(`/transactions/${id}/verify`);
-
     const transaction = response.data.data;
+
+    const sharetribeTransactionId = transaction.tx_ref?.split('_')?.[0];
+    const integrationSdk = getIntegrationSdk(req);
+
+    const txResponse = await integrationSdk.transactions.show(
+      {
+        id: sharetribeTransactionId,
+        include: ['booking', 'provider'],
+      },
+      {
+        expand: true,
+      }
+    );
+    const [tx] = denormalisedResponseEntities(txResponse);
+
+    const payInTotal = tx.attributes.payinTotal;
+    const expectedAmount = payInTotal.amount / 100;
+    const expectedCurrency = payInTotal.currency;
+
+    if (transaction.amount !== expectedAmount || transaction.currency !== expectedCurrency) {
+      const error = new Error(
+        `Transaction amount or currency does not match. Expected ${expectedAmount} ${expectedCurrency}, got ${transaction.amount} ${transaction.currency}`
+      );
+      error.status = 400;
+      error.statusText = 'Bad Request';
+      error.data = {
+        message: `Transaction amount or currency does not match. Expected ${expectedAmount} ${expectedCurrency}, got ${transaction.amount} ${transaction.currency}`,
+      };
+      throw error;
+    }
 
     // We proceed if the transaction status is 'successful' or 'pending'
     if (transaction.status === 'successful' || transaction.status === 'pending') {
@@ -32,9 +62,8 @@ const verifyPayment = async (req, res) => {
             status: 200,
             statusText: 'OK',
             data: {
-              status: transaction.status,
-              transactionId: transaction.id,
-              tx_ref: transaction.tx_ref,
+              ...transaction,
+              sharetribeTransaction: tx,
             },
           })
         )

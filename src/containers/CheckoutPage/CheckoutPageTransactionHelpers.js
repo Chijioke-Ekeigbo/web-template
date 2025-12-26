@@ -112,13 +112,17 @@ export const hasTransactionPassedPendingPayment = (tx, process) => {
   return process.hasPassedState(process.states.PENDING_PAYMENT, tx);
 };
 
+export const hasTransactionPassedPurchased = (tx, process) => {
+  return process.hasPassedState(process.states.PURCHASED, tx);
+};
+
 export const persistTransaction = (order, pageData, storeData, setPageData, sessionStorageKey) => {
   // Store the returned transaction (order)
   if (order?.id) {
     // Store order.
     const { orderData, listing } = pageData;
-    storeData(orderData, listing, order, sessionStorageKey);
-    setPageData({ ...pageData, transaction: order });
+    storeData(orderData, listing, { ...order, initiated: true }, sessionStorageKey);
+    setPageData({ ...pageData, transaction: { ...order, initiated: true } });
   }
 };
 
@@ -146,18 +150,18 @@ export const processCheckoutWithFlutterwave = (orderParams, extraPaymentParams) 
     const isOfferPendingInNegotiationProcess =
       resolveLatestProcessName(processAlias.split('/')[0]) === NEGOTIATION_PROCESS_NAME &&
       storedTx.attributes.state === `state/${process.states.OFFER_PENDING}`;
-
-    const requestTransition =
-      storedTx?.attributes?.lastTransition === process.transitions.INQUIRE
-        ? process.transitions.REQUEST_PAYMENT_AFTER_INQUIRY
-        : isOfferPendingInNegotiationProcess
-        ? process.transitions.REQUEST_PAYMENT_TO_ACCEPT_OFFER
-        : process.transitions.REQUEST_PAYMENT;
+    const isJustInquiry = storedTx?.attributes?.lastTransition === process.transitions.INQUIRE;
+    const requestTransition = isJustInquiry
+      ? process.transitions.REQUEST_PAYMENT_AFTER_INQUIRY
+      : isOfferPendingInNegotiationProcess
+      ? process.transitions.REQUEST_PAYMENT_TO_ACCEPT_OFFER
+      : process.transitions.REQUEST_PAYMENT;
     const isPrivileged = process.isPrivileged(requestTransition);
 
-    const orderPromise = storedTx.id
-      ? Promise.resolve(storedTx)
-      : onInitiateOrder(fnParams, processAlias, storedTx.id, requestTransition, isPrivileged);
+    const orderPromise =
+      !isJustInquiry && storedTx.id
+        ? Promise.resolve(storedTx)
+        : onInitiateOrder(fnParams, processAlias, storedTx.id, requestTransition, isPrivileged);
 
     orderPromise.then(order => {
       persistTransaction(order, pageData, storeData, setPageData, sessionStorageKey);
@@ -174,9 +178,19 @@ export const processCheckoutWithFlutterwave = (orderParams, extraPaymentParams) 
     });
   };
 
+  // Step 3: redirect to Flutterwave checkout link
+  const fnRedirectToFlutterwaveCheckout = fnParams => {
+    const { checkoutLink } = fnParams;
+    window.location.href = checkoutLink;
+  };
+
   const applyAsync = (acc, val) => acc.then(val);
   const composeAsync = (...funcs) => x => funcs.reduce(applyAsync, Promise.resolve(x));
-  const handleCheckoutCreation = composeAsync(fnRequestPayment, fnCreateFlutterwaveCheckout);
+  const handleCheckoutCreation = composeAsync(
+    fnRequestPayment,
+    fnCreateFlutterwaveCheckout,
+    fnRedirectToFlutterwaveCheckout
+  );
 
   return handleCheckoutCreation(orderParams);
 };

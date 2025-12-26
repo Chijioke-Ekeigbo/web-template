@@ -370,7 +370,7 @@ class EditListingWizard extends Component {
   }
 
   handlePublishListing(id) {
-    const { onPublishListingDraft, currentUser, listing, config } = this.props;
+    const { onPublishListingDraft, listing, config, subaccount } = this.props;
     const processName = listing?.attributes?.publicData?.transactionProcessAlias.split('/')[0];
     const isInquiryProcess = processName === INQUIRY_PROCESS_NAME;
 
@@ -380,9 +380,8 @@ class EditListingWizard extends Component {
     // Customers can't purchase these listings - but it gives operator opportunity to discuss with providers who fail to do so.
     const isPayoutDetailsRequired = requirePayoutDetails(listingTypeConfig);
 
-    const flutterwaveConnected = !!currentUser?.attributes?.profile?.privateData
-      ?.flutterwaveSubaccount?.subaccountId;
-
+    const flutterwaveConnected = !!subaccount;
+    console.log({ flutterwaveConnected, subaccount });
     if (isInquiryProcess || !isPayoutDetailsRequired || flutterwaveConnected) {
       onPublishListingDraft(id);
     } else {
@@ -415,7 +414,7 @@ class EditListingWizard extends Component {
       config,
       routeConfiguration,
       authScopes,
-      flutterwaveSubaccountFetched,
+      subaccountFetched,
       flutterwaveSubaccountError,
       ...rest
     } = this.props;
@@ -613,7 +612,7 @@ class EditListingWizard extends Component {
                     id: 'EditListingWizard.payoutModalSubmitButtonText',
                   })}
                   flutterwaveSubaccountError={flutterwaveSubaccountError}
-                  flutterwaveSubaccountFetched={flutterwaveSubaccountFetched}
+                  flutterwaveSubaccountFetched={subaccountFetched}
                   onChange={onPayoutDetailsChange}
                   onSubmit={rest.onPayoutDetailsSubmit}
                   flutterwaveConnected={flutterwaveConnected}

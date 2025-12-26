@@ -1,15 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 // Import contexts and util modules
 import { FormattedMessage } from '../../util/reactIntl';
-import { createResourceLocatorString } from '../../util/routes';
 import { propTypes } from '../../util/types';
 import { ensureTransaction } from '../../util/data';
 import { createSlug } from '../../util/urlHelpers';
 import { isTransactionInitiateListingNotFoundError } from '../../util/errors';
-import { types as sdkTypes } from '../../util/sdkLoader';
 
-const { UUID } = sdkTypes;
 import {
   getProcess,
   resolveLatestProcessName,
@@ -28,6 +25,7 @@ import {
   getTransactionTypeData,
   hasPaymentExpired,
   hasTransactionPassedPendingPayment,
+  hasTransactionPassedPurchased,
   persistTransaction,
   processCheckoutWithFlutterwave,
 } from './CheckoutPageTransactionHelpers.js';
@@ -40,6 +38,8 @@ import MobileOrderBreakdown from './MobileOrderBreakdown';
 
 import css from './CheckoutPage.module.css';
 import PaymentForm from './PaymentForm/PaymentForm.js';
+import { useMemo } from 'react';
+import { createResourceLocatorString } from '../../util/routes.js';
 
 const capitalizeString = s => `${s.charAt(0).toUpperCase()}${s.substr(1)}`;
 
@@ -215,14 +215,10 @@ const handleSubmit = (
   setConfirmationProcessed(false);
 
   const {
-    history,
     config,
-    routeConfiguration,
     speculatedTransaction,
-    dispatch,
     onInitiateOrder,
     onSendMessage,
-    onSubmitCallback,
     onCreateFlutterwaveCheckout,
     pageData,
     setPageData,
@@ -252,25 +248,18 @@ const handleSubmit = (
 
   // These are the order parameters for the first payment-related transition
   // which is either initiate-transition or initiate-transition-after-enquiry
-  const orderParams = getOrderParams(pageData, shippingDetails, optionalPaymentParams, config);
+  const orderParams = getOrderParams(
+    { ...pageData, orderData: updatedOrderData },
+    shippingDetails,
+    optionalPaymentParams,
+    config
+  );
 
   // Use processCheckoutWithFlutterwave instead of processCheckoutWithPayment
-  processCheckoutWithFlutterwave(orderParams, requestPaymentParams)
-    .then(response => {
-      const { checkoutLink } = response;
-      setSubmitting(false);
-
-      // Redirect to Flutterwave checkout link
-      if (checkoutLink) {
-        window.location.href = checkoutLink;
-      } else {
-        throw new Error('Flutterwave checkout link not found');
-      }
-    })
-    .catch(err => {
-      console.error(err);
-      setSubmitting(false);
-    });
+  processCheckoutWithFlutterwave(orderParams, requestPaymentParams).catch(err => {
+    console.error(err);
+    setSubmitting(false);
+  });
 };
 
 /**
@@ -317,7 +306,6 @@ export const CheckoutPageWithPayment = props => {
     speculatedTransaction: speculatedTransactionMaybe,
     isClockInSync,
     initiateOrderError,
-    confirmPaymentError,
     intl,
     currentUser,
     showListingImage,
@@ -326,14 +314,14 @@ export const CheckoutPageWithPayment = props => {
     listingTitle,
     title,
     config,
+    onSubmitCallback,
     history,
     onConfirmPayment,
     onSendMessage,
     routeConfiguration,
-    onSubmitCallback,
+    onVerifyPayment,
     setPageData,
     sessionStorageKey,
-    onVerifyPayment,
   } = props;
 
   // Since the listing data is already given from the ListingPage
@@ -375,10 +363,17 @@ export const CheckoutPageWithPayment = props => {
     ) {
       setSubmitting(true);
       setConfirmationProcessed(true);
-
       onVerifyPayment(flutterwaveTransactionId)
         .then(response => {
           const flutterwaveStatus = response.status;
+          const lastestTransaction = response.sharetribeTransaction;
+          persistTransaction(
+            lastestTransaction,
+            pageData,
+            storeData,
+            setPageData,
+            sessionStorageKey
+          );
 
           if (flutterwaveStatus === 'pending') {
             setSubmitting(false);
@@ -387,16 +382,17 @@ export const CheckoutPageWithPayment = props => {
             return Promise.reject({ name: 'PaymentPending' });
           }
 
-          const transactionId = tx.id;
+          const transactionId = lastestTransaction.id;
           const transitionName = process.transitions.CONFIRM_PAYMENT;
-          const alreadyConfirmed = tx?.attributes?.lastTransition === transitionName;
+          const alreadyConfirmed = hasTransactionPassedPurchased(lastestTransaction, process);
           const confirmPaymentFn = alreadyConfirmed
-            ? Promise.resolve(tx)
+            ? Promise.resolve(lastestTransaction)
             : onConfirmPayment(transactionId, transitionName);
 
           return confirmPaymentFn;
         })
         .then(order => {
+          //ensure persisted transaction is updated with the latest data
           persistTransaction(order, pageData, storeData, setPageData, sessionStorageKey);
           const message = pageData?.orderData?.message;
           if (message) {
@@ -501,9 +497,13 @@ export const CheckoutPageWithPayment = props => {
   const providerDisplayName = isNegotiation
     ? existingTransaction?.provider?.attributes?.profile?.displayName
     : listing?.author?.attributes?.profile?.displayName;
-  const initialValues = {
-    message: orderData?.message,
-  };
+
+  const initialMessage = orderData?.message || tx.attributes.protectedData?.initialMessage;
+  const initialValues = useMemo(() => {
+    return {
+      message: initialMessage,
+    };
+  }, [initialMessage]);
   return (
     <Page title={title} scrollingDisabled={scrollingDisabled}>
       <TopbarSimplified />

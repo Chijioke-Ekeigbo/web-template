@@ -237,7 +237,7 @@ const ErrorsMaybe = props => {
  * @param {boolean} props.ready - Whether the form is ready
  * @param {string} props.savedCountry - The saved country
  * @param {string} props.savedAccountBank - The saved account bank
- * @param {boolean} props.flutterwaveSubaccountFetched - Whether the Flutterwave subaccount data is fetched
+ * @param {boolean} props.subaccountFetched - Whether the Flutterwave subaccount data is fetched
  * @param {string} props.submitButtonText - The text for the submit button
  * @returns {JSX.Element}
  */
@@ -284,20 +284,18 @@ const FlutterwaveSubaccountForm = props => {
           savedAccountNumber,
           savedBusinessName,
           savedBusinessNumber,
-          flutterwaveSubaccountFetched,
+          subaccountFetched,
           submitButtonText,
           form: formApi,
           values,
           flutterwaveConnected,
-          currentUser,
           authScopes,
         } = fieldRenderProps;
 
         // Check if current user has limited rights in order to disable the submit button
         const limitedRights = authScopes?.indexOf('user:limited') >= 0;
 
-        const accountDataLoaded =
-          flutterwaveConnected && flutterwaveSubaccountFetched && savedCountry;
+        const accountDataLoaded = flutterwaveConnected && subaccountFetched && savedCountry;
         const submitInProgress = inProgress;
         const submitDisabled =
           pristine ||

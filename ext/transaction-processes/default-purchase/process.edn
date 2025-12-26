@@ -27,6 +27,12 @@
    [{:name :action/accept-stock-reservation}],
    :from :state/pending-payment,
    :to :state/purchased}
+  {:name :transition/confirm-payment-via-webhook,
+   :actor :actor.role/operator,
+   :actions
+   [{:name :action/accept-stock-reservation}],
+   :from :state/pending-payment,
+   :to :state/purchased}
   {:name :transition/expire-payment,
    :at
    {:fn/plus
@@ -183,12 +189,32 @@
      {:fn/period ["PT15M"]}]},
    :to :actor.role/customer,
    :template :purchase-order-receipt}
+  {:name :notification/order-receipt-via-webhook,
+   :on :transition/confirm-payment-via-webhook,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/purchased]}
+     {:fn/period ["PT15M"]}]},
+   :to :actor.role/customer,
+   :template :purchase-order-receipt}
   {:name :notification/purchase-new-order,
    :on :transition/confirm-payment,
    :to :actor.role/provider,
    :template :purchase-new-order}
+  {:name :notification/purchase-new-order-via-webhook,
+   :on :transition/confirm-payment-via-webhook,
+   :to :actor.role/provider,
+   :template :purchase-new-order}
   {:name :notification/shipping-reminder,
    :on :transition/confirm-payment,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/purchased]}
+     {:fn/period ["P3D"]}]},
+   :to :actor.role/provider,
+   :template :purchase-shipping-reminder}
+  {:name :notification/shipping-reminder-via-webhook,
+   :on :transition/confirm-payment-via-webhook,
    :at
    {:fn/plus
     [{:fn/timepoint [:time/first-entered-state :state/purchased]}

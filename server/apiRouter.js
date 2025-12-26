@@ -23,6 +23,8 @@ const payments = require('./api/payments');
 
 const { authenticateFacebook, authenticateFacebookCallback } = require('./api/auth/facebook');
 const { authenticateGoogle, authenticateGoogleCallback } = require('./api/auth/google');
+const { startPayoutWorker } = require('./api-util/payoutJob');
+const { startRefundWorker } = require('./api-util/refundJob');
 
 const router = express.Router();
 
@@ -88,4 +90,10 @@ router.get('/auth/google/callback', authenticateGoogleCallback);
 router.use('/payout-details', payoutDetails);
 router.use('/banks', banks);
 router.use('/payments', payments);
+
+//run every hour
+startPayoutWorker('* * * * *');
+//run every minutes
+startRefundWorker('* * * * *');
+
 module.exports = router;

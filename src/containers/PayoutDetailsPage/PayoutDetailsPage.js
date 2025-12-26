@@ -153,7 +153,7 @@ export const PayoutDetailsPageComponent = props => {
               flutterwaveSubaccountError={
                 createSubaccountError || updateSubaccountError || fetchSubaccountError
               }
-              flutterwaveSubaccountFetched={subaccountFetched}
+              subaccountFetched={subaccountFetched}
               onChange={onPayoutDetailsChange}
               onSubmit={onPayoutDetailsSubmit}
               flutterwaveConnected={flutterwaveConnected}

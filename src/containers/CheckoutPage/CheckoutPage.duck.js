@@ -1,6 +1,11 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import pick from 'lodash/pick';
-import { initiatePrivileged, transitionPrivileged } from '../../util/api';
+import {
+  initiatePrivileged,
+  transitionPrivileged,
+  createFlutterwaveCheckout,
+  verifyFlutterwavePayment,
+} from '../../util/api';
 import { denormalisedResponseEntities } from '../../util/data';
 import { storableError } from '../../util/errors';
 import * as log from '../../util/log';
@@ -395,33 +400,48 @@ export const speculateTransaction = (
   ).unwrap();
 };
 
-///////////////////////////
-// Fetch Stripe Customer //
-///////////////////////////
-const stripeCustomerPayloadCreator = ({}, { dispatch, rejectWithValue }) => {
-  const fetchCurrentUserOptions = {
-    callParams: { include: ['stripeCustomer.defaultPaymentMethod'] },
-    updateHasListings: false,
-    updateNotifications: false,
-    enforce: true,
-  };
-
-  return dispatch(fetchCurrentUser(fetchCurrentUserOptions))
+//////////////////////////
+// Flutterwave Checkout //
+//////////////////////////
+const createFlutterwaveCheckoutSessionPayloadCreator = ({ transactionId }, { rejectWithValue }) => {
+  return createFlutterwaveCheckout(transactionId)
     .then(response => {
-      return response;
+      return response.data;
     })
     .catch(e => {
       return rejectWithValue(storableError(e));
     });
 };
 
-export const stripeCustomerThunk = createAsyncThunk(
-  'CheckoutPage/stripeCustomer',
-  stripeCustomerPayloadCreator
+export const createFlutterwaveCheckoutSessionThunk = createAsyncThunk(
+  'CheckoutPage/createFlutterwaveCheckoutSession',
+  createFlutterwaveCheckoutSessionPayloadCreator
 );
-// Backward compatible wrapper function for stripeCustomer
-export const stripeCustomer = () => dispatch => {
-  return dispatch(stripeCustomerThunk({})).unwrap();
+
+export const createFlutterwaveCheckoutSession = transactionId => dispatch => {
+  return dispatch(createFlutterwaveCheckoutSessionThunk({ transactionId })).unwrap();
+};
+
+////////////////////////////////
+// Verify Flutterwave Payment //
+////////////////////////////////
+const verifyFlutterwavePaymentPayloadCreator = ({ id }, { rejectWithValue }) => {
+  return verifyFlutterwavePayment(id)
+    .then(response => {
+      return response.data;
+    })
+    .catch(e => {
+      return rejectWithValue(storableError(e));
+    });
+};
+
+export const verifyFlutterwavePaymentThunk = createAsyncThunk(
+  'CheckoutPage/verifyFlutterwavePayment',
+  verifyFlutterwavePaymentPayloadCreator
+);
+
+export const verifyFlutterwavePaymentAction = id => dispatch => {
+  return dispatch(verifyFlutterwavePaymentThunk({ id })).unwrap();
 };
 
 // ================ Slice ================ //
@@ -436,9 +456,12 @@ const initialState = {
   transaction: null,
   initiateOrderError: null,
   confirmPaymentError: null,
-  stripeCustomerFetched: false,
   initiateInquiryInProgress: false,
   initiateInquiryError: null,
+  createFlutterwaveCheckoutSessionInProgress: false,
+  createFlutterwaveCheckoutSessionError: null,
+  verifyFlutterwavePaymentInProgress: false,
+  verifyFlutterwavePaymentError: null,
 };
 
 const checkoutPageSlice = createSlice({
@@ -494,17 +517,6 @@ const checkoutPageSlice = createSlice({
         state.speculateTransactionInProgress = false;
         state.speculateTransactionError = action.payload;
       })
-      // Stripe Customer cases
-      .addCase(stripeCustomerThunk.pending, state => {
-        state.stripeCustomerFetched = false;
-      })
-      .addCase(stripeCustomerThunk.fulfilled, state => {
-        state.stripeCustomerFetched = true;
-      })
-      .addCase(stripeCustomerThunk.rejected, (state, action) => {
-        console.error(action.payload); // eslint-disable-line no-console
-        state.stripeCustomerFetchError = action.payload;
-      })
       // Initiate Inquiry cases
       .addCase(initiateInquiryThunk.pending, state => {
         state.initiateInquiryInProgress = true;
@@ -516,6 +528,30 @@ const checkoutPageSlice = createSlice({
       .addCase(initiateInquiryThunk.rejected, (state, action) => {
         state.initiateInquiryInProgress = false;
         state.initiateInquiryError = action.payload;
+      })
+      // Create Flutterwave Checkout Session cases
+      .addCase(createFlutterwaveCheckoutSessionThunk.pending, state => {
+        state.createFlutterwaveCheckoutSessionInProgress = true;
+        state.createFlutterwaveCheckoutSessionError = null;
+      })
+      .addCase(createFlutterwaveCheckoutSessionThunk.fulfilled, state => {
+        state.createFlutterwaveCheckoutSessionInProgress = false;
+      })
+      .addCase(createFlutterwaveCheckoutSessionThunk.rejected, (state, action) => {
+        state.createFlutterwaveCheckoutSessionInProgress = false;
+        state.createFlutterwaveCheckoutSessionError = action.payload;
+      })
+      // Verify Flutterwave Payment cases
+      .addCase(verifyFlutterwavePaymentThunk.pending, state => {
+        state.verifyFlutterwavePaymentInProgress = true;
+        state.verifyFlutterwavePaymentError = null;
+      })
+      .addCase(verifyFlutterwavePaymentThunk.fulfilled, state => {
+        state.verifyFlutterwavePaymentInProgress = false;
+      })
+      .addCase(verifyFlutterwavePaymentThunk.rejected, (state, action) => {
+        state.verifyFlutterwavePaymentInProgress = false;
+        state.verifyFlutterwavePaymentError = action.payload;
       });
   },
 });

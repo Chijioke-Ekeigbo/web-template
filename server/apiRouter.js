@@ -16,11 +16,15 @@ const transactionLineItems = require('./api/transaction-line-items');
 const initiatePrivileged = require('./api/initiate-privileged');
 const transitionPrivileged = require('./api/transition-privileged');
 const deleteAccount = require('./api/delete-account');
-
+const payoutDetails = require('./api/payout-details');
+const banks = require('./api/banks');
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
+const payments = require('./api/payments');
 
 const { authenticateFacebook, authenticateFacebookCallback } = require('./api/auth/facebook');
 const { authenticateGoogle, authenticateGoogleCallback } = require('./api/auth/google');
+const { startPayoutWorker } = require('./jobs/payoutJob');
+const { startRefundWorker } = require('./jobs/refundJob');
 
 const router = express.Router();
 
@@ -81,5 +85,26 @@ router.get('/auth/google', authenticateGoogle);
 // with Google. In this route a Passport.js custom callback is used for calling
 // loginWithIdp endpoint in Sharetribe Auth API to authenticate user to the marketplace
 router.get('/auth/google/callback', authenticateGoogleCallback);
+
+// Payout details endpoints
+router.use('/payout-details', payoutDetails);
+router.use('/banks', banks);
+router.use('/payments', payments);
+
+setTimeout(() => {
+  // Run payout and refund jobs with configurable intervals
+  const PAYOUT_JOB_INTERVAL_MINUTE = process.env.PAYOUT_JOB_INTERVAL_MINUTE
+    ? parseInt(process.env.PAYOUT_JOB_INTERVAL_MINUTE)
+    : 60; // Default to every 60 minutes
+  const REFUND_JOB_INTERVAL_MINUTE = process.env.REFUND_JOB_INTERVAL_MINUTE
+    ? parseInt(process.env.REFUND_JOB_INTERVAL_MINUTE)
+    : 15; // Default to every 15 minutes
+
+  const PAYOUT_SCHEDULE = `*/${PAYOUT_JOB_INTERVAL_MINUTE} * * * *`;
+  const REFUND_SCHEDULE = `*/${REFUND_JOB_INTERVAL_MINUTE} * * * *`;
+
+  startPayoutWorker(PAYOUT_SCHEDULE);
+  startRefundWorker(REFUND_SCHEDULE);
+}, 10000);
 
 module.exports = router;

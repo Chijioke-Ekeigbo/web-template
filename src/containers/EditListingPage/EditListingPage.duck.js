@@ -20,10 +20,11 @@ import { isBookingProcessAlias } from '../../transactions/transaction';
 
 import { addMarketplaceEntities } from '../../ducks/marketplaceData.duck';
 import {
-  createStripeAccount,
-  updateStripeAccount,
-  fetchStripeAccount,
-} from '../../ducks/stripeConnectAccount.duck';
+  createFlutterwaveSubaccount,
+  updateFlutterwaveSubaccount,
+  fetchFlutterwaveSubaccount,
+  setFlutterwaveSubaccount,
+} from '../../ducks/flutterwaveSubaccount.duck';
 import { fetchCurrentUser } from '../../ducks/user.duck';
 
 const { UUID } = sdkTypes;
@@ -439,9 +440,9 @@ const savePayoutDetailsPayloadCreator = (
   { values, isUpdateCall },
   { dispatch, rejectWithValue }
 ) => {
-  const upsertThunk = isUpdateCall ? updateStripeAccount : createStripeAccount;
+  const upsertThunk = isUpdateCall ? updateFlutterwaveSubaccount : createFlutterwaveSubaccount;
 
-  return dispatch(upsertThunk(values, { expand: true }))
+  return dispatch(upsertThunk(values))
     .then(response => {
       return response;
     })
@@ -873,8 +874,12 @@ export const loadData = (params, search, config) => (dispatch, getState, sdk) =>
     return Promise.all([dispatch(fetchCurrentUser(fetchCurrentUserOptions))])
       .then(response => {
         const currentUser = getState().user.currentUser;
-        if (currentUser && currentUser.stripeAccount) {
-          dispatch(fetchStripeAccount());
+        if (currentUser && currentUser.attributes?.profile?.privateData?.flutterwaveSubaccount) {
+          dispatch(
+            setFlutterwaveSubaccount(
+              currentUser.attributes?.profile?.privateData?.flutterwaveSubaccount
+            )
+          );
         }
         return response;
       })
@@ -890,13 +895,15 @@ export const loadData = (params, search, config) => (dispatch, getState, sdk) =>
   ])
     .then(response => {
       const currentUser = getState().user.currentUser;
-
+      if (currentUser && currentUser.attributes?.profile?.privateData?.flutterwaveSubaccount) {
+        dispatch(
+          setFlutterwaveSubaccount(
+            currentUser.attributes?.profile?.privateData?.flutterwaveSubaccount
+          )
+        );
+      }
       // Do not fetch extra information if user is in pending-approval state.
       if (isUserAuthorized(currentUser)) {
-        if (currentUser && currentUser.stripeAccount) {
-          dispatch(fetchStripeAccount());
-        }
-
         // Because of two dispatch functions, response is an array.
         // We are only interested in the response from requestShowListing here,
         // so we need to pick the first one

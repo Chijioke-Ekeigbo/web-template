@@ -99,6 +99,7 @@ export { default as FieldReviewRating } from './FieldReviewRating/FieldReviewRat
 export { default as FieldSelect } from './FieldSelect/FieldSelect';
 export { default as FieldSelectTree } from './FieldSelectTree/FieldSelectTree';
 export { default as FieldTextInput } from './FieldTextInput/FieldTextInput';
+export { default as BankSearchInput } from './BankSearchInput/BankSearchInput';
 
 // Fields that use other Fields
 export { default as FieldBoolean } from './FieldBoolean/FieldBoolean';
@@ -136,6 +137,7 @@ export { default as TopbarSimplified } from './TopbarSimplified/TopbarSimplified
 
 // Forms
 export { default as StripeConnectAccountForm } from './StripeConnectAccountForm/StripeConnectAccountForm';
+export { default as FlutterwaveSubaccountForm } from './FlutterwaveSubaccountForm/FlutterwaveSubaccountForm';
 
 //////////////////////////////////////////////
 // Page sections and modal content wrappers //

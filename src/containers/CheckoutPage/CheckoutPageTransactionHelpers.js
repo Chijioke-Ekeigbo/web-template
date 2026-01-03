@@ -1,6 +1,6 @@
 // Import contexts and util modules
 import { findRouteByRouteName } from '../../util/routes';
-import { ensureStripeCustomer, ensureTransaction } from '../../util/data';
+import { ensureTransaction } from '../../util/data';
 import { minutesBetween } from '../../util/dates';
 import { formatMoney } from '../../util/currency';
 import { NEGOTIATION_PROCESS_NAME, resolveLatestProcessName } from '../../transactions/transaction';
@@ -33,40 +33,6 @@ export const getTransactionTypeData = (listingType, unitTypeInPublicData, config
  */
 export const bookingDatesMaybe = bookingDates => {
   return bookingDates ? { bookingDates } : {};
-};
-
-/**
- * Construct billing details (JSON-like object) for the Stripe API
- *
- * @param {Object} formValues object containing name, addressLine1, addressLine2, postal, city, state, country
- * @param {Object} currentUser
- * @returns Object that contains name, email and potentially address data for the Stripe API
- */
-export const getBillingDetails = (formValues, currentUser) => {
-  const { name, addressLine1, addressLine2, postal, city, state, country } = formValues;
-
-  // Billing address is recommended.
-  // However, let's not assume that <StripePaymentAddress> data is among formValues.
-  // Read more about this from Stripe's docs
-  // https://stripe.com/docs/stripe-js/reference#stripe-handle-card-payment-no-element
-  const addressMaybe =
-    addressLine1 && postal
-      ? {
-          address: {
-            city: city,
-            country: country,
-            line1: addressLine1,
-            line2: addressLine2,
-            postal_code: postal,
-            state: state,
-          },
-        }
-      : {};
-  return {
-    name,
-    email: currentUser?.attributes?.email,
-    ...addressMaybe,
-  };
 };
 
 /**
@@ -121,19 +87,6 @@ export const getShippingDetailsMaybe = formValues => {
 };
 
 /**
- * Check if the default payment method exists for the currentUser
- * @param {Boolean} stripeCustomerFetched
- * @param {Object} currentUser
- * @returns true if default payment method has been set
- */
-export const hasDefaultPaymentMethod = (stripeCustomerFetched, currentUser) =>
-  !!(
-    stripeCustomerFetched &&
-    currentUser?.stripeCustomer?.attributes?.stripeCustomerId &&
-    currentUser?.stripeCustomer?.defaultPaymentMethod?.id
-  );
-
-/**
  * Check if payment is expired (PAYMENT_EXPIRED state) or if payment has passed 15 minute treshold from PENDING_PAYMENT
  *
  * @param {Object} existingTransaction
@@ -159,197 +112,87 @@ export const hasTransactionPassedPendingPayment = (tx, process) => {
   return process.hasPassedState(process.states.PENDING_PAYMENT, tx);
 };
 
-const persistTransaction = (order, pageData, storeData, setPageData, sessionStorageKey) => {
+export const hasTransactionPassedPurchased = (tx, process) => {
+  return process.hasPassedState(process.states.PURCHASED, tx);
+};
+
+export const persistTransaction = (order, pageData, storeData, setPageData, sessionStorageKey) => {
   // Store the returned transaction (order)
   if (order?.id) {
     // Store order.
     const { orderData, listing } = pageData;
-    storeData(orderData, listing, order, sessionStorageKey);
-    setPageData({ ...pageData, transaction: order });
+    storeData(orderData, listing, { ...order, initiated: true }, sessionStorageKey);
+    setPageData({ ...pageData, transaction: { ...order, initiated: true } });
   }
 };
 
 /**
- * Create call sequence for checkout with Stripe PaymentIntents.
+ * Create call sequence for checkout with Flutterwave Standard Checkout.
  *
  * @param {Object} orderParams contains params for the initial order itself
  * @param {Object} extraPaymentParams contains extra params needed by one of the following calls in the checkout sequence
  * @returns Promise that goes through each step in the checkout sequence.
  */
-export const processCheckoutWithPayment = (orderParams, extraPaymentParams) => {
+export const processCheckoutWithFlutterwave = (orderParams, extraPaymentParams) => {
   const {
-    hasPaymentIntentUserActionsDone,
-    isPaymentFlowUseSavedCard,
-    isPaymentFlowPayAndSaveCard,
-    message,
-    onConfirmCardPayment,
-    onConfirmPayment,
     onInitiateOrder,
-    onSavePaymentMethod,
-    onSendMessage,
     pageData,
-    paymentIntent,
     process,
     setPageData,
     sessionStorageKey,
-    stripeCustomer,
-    stripePaymentMethodId,
+    onCreateFlutterwaveCheckout,
   } = extraPaymentParams;
   const storedTx = ensureTransaction(pageData.transaction);
-
-  const ensuredStripeCustomer = ensureStripeCustomer(stripeCustomer);
   const processAlias = pageData?.listing?.attributes?.publicData?.transactionProcessAlias;
 
-  let createdPaymentIntent = null;
-
-  ////////////////////////////////////////////////
-  // Step 1: initiate order                     //
-  // by requesting payment from Marketplace API //
-  ////////////////////////////////////////////////
+  // Step 1: initiate order
   const fnRequestPayment = fnParams => {
-    // fnParams should be { listingId, deliveryMethod?, quantity?, bookingDates?, paymentMethod?.setupPaymentMethodForSaving?, protectedData }
-    const hasPaymentIntents = storedTx.attributes.protectedData?.stripePaymentIntents;
-
     const isOfferPendingInNegotiationProcess =
       resolveLatestProcessName(processAlias.split('/')[0]) === NEGOTIATION_PROCESS_NAME &&
       storedTx.attributes.state === `state/${process.states.OFFER_PENDING}`;
-
-    const requestTransition =
-      storedTx?.attributes?.lastTransition === process.transitions.INQUIRE
-        ? process.transitions.REQUEST_PAYMENT_AFTER_INQUIRY
-        : isOfferPendingInNegotiationProcess
-        ? process.transitions.REQUEST_PAYMENT_TO_ACCEPT_OFFER
-        : process.transitions.REQUEST_PAYMENT;
+    const isJustInquiry = storedTx?.attributes?.lastTransition === process.transitions.INQUIRE;
+    const requestTransition = isJustInquiry
+      ? process.transitions.REQUEST_PAYMENT_AFTER_INQUIRY
+      : isOfferPendingInNegotiationProcess
+      ? process.transitions.REQUEST_PAYMENT_TO_ACCEPT_OFFER
+      : process.transitions.REQUEST_PAYMENT;
     const isPrivileged = process.isPrivileged(requestTransition);
 
-    // If paymentIntent exists, order has been initiated previously.
-    const orderPromise = hasPaymentIntents
-      ? Promise.resolve(storedTx)
-      : onInitiateOrder(fnParams, processAlias, storedTx.id, requestTransition, isPrivileged);
+    const orderPromise =
+      !isJustInquiry && storedTx.id
+        ? Promise.resolve(storedTx)
+        : onInitiateOrder(fnParams, processAlias, storedTx.id, requestTransition, isPrivileged);
 
     orderPromise.then(order => {
-      // Store the returned transaction (order)
       persistTransaction(order, pageData, storeData, setPageData, sessionStorageKey);
     });
 
     return orderPromise;
   };
 
-  //////////////////////////////////
-  // Step 2: pay using Stripe SDK //
-  //////////////////////////////////
-  const fnConfirmCardPayment = fnParams => {
-    // fnParams should be returned transaction entity
+  // Step 2: create Flutterwave checkout link
+  const fnCreateFlutterwaveCheckout = fnParams => {
     const order = fnParams;
-
-    const hasPaymentIntents = order?.attributes?.protectedData?.stripePaymentIntents;
-    if (!hasPaymentIntents) {
-      throw new Error(
-        `Missing StripePaymentIntents key in transaction's protectedData. Check that your transaction process is configured to use payment intents.`
-      );
-    }
-
-    const { stripePaymentIntentClientSecret } = hasPaymentIntents
-      ? order.attributes.protectedData.stripePaymentIntents.default
-      : null;
-
-    const { stripe, card, billingDetails, paymentIntent } = extraPaymentParams;
-    const stripeElementMaybe = !isPaymentFlowUseSavedCard ? { card } : {};
-
-    // Note: For basic USE_SAVED_CARD scenario, we have set it already on API side, when PaymentIntent was created.
-    // However, the payment_method is save here for USE_SAVED_CARD flow if customer first attempted onetime payment
-    const paymentParams = !isPaymentFlowUseSavedCard
-      ? {
-          payment_method: {
-            billing_details: billingDetails,
-            card: card,
-          },
-        }
-      : { payment_method: stripePaymentMethodId };
-
-    const params = {
-      stripePaymentIntentClientSecret,
-      orderId: order?.id,
-      stripe,
-      ...stripeElementMaybe,
-      paymentParams,
-    };
-
-    return hasPaymentIntentUserActionsDone
-      ? Promise.resolve({ transactionId: order?.id, paymentIntent })
-      : onConfirmCardPayment(params);
-  };
-
-  ///////////////////////////////////////////////////
-  // Step 3: complete order                        //
-  // by confirming payment against Marketplace API //
-  ///////////////////////////////////////////////////
-  const fnConfirmPayment = fnParams => {
-    // fnParams should contain { paymentIntent, transactionId } returned in step 2
-    // Remember the created PaymentIntent for step 5
-    createdPaymentIntent = fnParams.paymentIntent;
-    const transactionId = fnParams.transactionId;
-    const transitionName = process.transitions.CONFIRM_PAYMENT;
-    const isTransitionedAlready = storedTx?.attributes?.lastTransition === transitionName;
-    const orderPromise = isTransitionedAlready
-      ? Promise.resolve(storedTx)
-      : onConfirmPayment(transactionId, transitionName, {});
-
-    orderPromise.then(order => {
-      // Store the returned transaction (order)
-      persistTransaction(order, pageData, storeData, setPageData, sessionStorageKey);
+    return onCreateFlutterwaveCheckout(order.id).then(response => {
+      return { ...fnParams, checkoutLink: response.link };
     });
-
-    return orderPromise;
   };
 
-  //////////////////////////////////
-  // Step 4: send initial message //
-  //////////////////////////////////
-  const fnSendMessage = fnParams => {
-    const orderId = fnParams?.id;
-    return onSendMessage({ id: orderId, message });
+  // Step 3: redirect to Flutterwave checkout link
+  const fnRedirectToFlutterwaveCheckout = fnParams => {
+    const { checkoutLink } = fnParams;
+    window.location.href = checkoutLink;
   };
 
-  //////////////////////////////////////////////////////////
-  // Step 5: optionally save card as defaultPaymentMethod //
-  //////////////////////////////////////////////////////////
-  const fnSavePaymentMethod = fnParams => {
-    const pi = createdPaymentIntent || paymentIntent;
-
-    if (isPaymentFlowPayAndSaveCard) {
-      return onSavePaymentMethod(ensuredStripeCustomer, pi.payment_method)
-        .then(response => {
-          if (response.errors) {
-            return { ...fnParams, paymentMethodSaved: false };
-          }
-          return { ...fnParams, paymentMethodSaved: true };
-        })
-        .catch(e => {
-          // Real error cases are catched already in paymentMethods page.
-          return { ...fnParams, paymentMethodSaved: false };
-        });
-    } else {
-      return Promise.resolve({ ...fnParams, paymentMethodSaved: true });
-    }
-  };
-
-  // Here we create promise calls in sequence
-  // This is pretty much the same as:
-  // fnRequestPayment({...initialParams})
-  //   .then(result => fnConfirmCardPayment({...result}))
-  //   .then(result => fnConfirmPayment({...result}))
   const applyAsync = (acc, val) => acc.then(val);
   const composeAsync = (...funcs) => x => funcs.reduce(applyAsync, Promise.resolve(x));
-  const handlePaymentIntentCreation = composeAsync(
+  const handleCheckoutCreation = composeAsync(
     fnRequestPayment,
-    fnConfirmCardPayment,
-    fnConfirmPayment,
-    fnSendMessage,
-    fnSavePaymentMethod
+    fnCreateFlutterwaveCheckout,
+    fnRedirectToFlutterwaveCheckout
   );
 
-  return handlePaymentIntentCreation(orderParams);
+  return handleCheckoutCreation(orderParams);
 };
 
 /**

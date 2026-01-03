@@ -24,10 +24,7 @@ import { ensureOwnListing } from '../../util/data';
 import { hasPermissionToPostListings, isUserAuthorized } from '../../util/userHelpers';
 import { getMarketplaceEntities } from '../../ducks/marketplaceData.duck';
 import { manageDisableScrolling, isScrollingDisabled } from '../../ducks/ui.duck';
-import {
-  stripeAccountClearError,
-  getStripeConnectAccountLink,
-} from '../../ducks/stripeConnectAccount.duck';
+import { flutterwaveSubaccountClearError } from '../../ducks/flutterwaveSubaccount.duck';
 
 // Import shared components
 import { NamedRedirect, Page } from '../../components';
@@ -47,13 +44,6 @@ import {
 } from './EditListingPage.duck';
 import EditListingWizard from './EditListingWizard/EditListingWizard';
 import css from './EditListingPage.module.css';
-
-const STRIPE_ONBOARDING_RETURN_URL_SUCCESS = 'success';
-const STRIPE_ONBOARDING_RETURN_URL_FAILURE = 'failure';
-const STRIPE_ONBOARDING_RETURN_URL_TYPES = [
-  STRIPE_ONBOARDING_RETURN_URL_SUCCESS,
-  STRIPE_ONBOARDING_RETURN_URL_FAILURE,
-];
 
 const { UUID } = sdkTypes;
 
@@ -92,12 +82,8 @@ const pickRenderableImages = (
  * @component
  * @param {Object} props
  * @param {propTypes.currentUser} props.currentUser - The current user
- * @param {propTypes.error} [props.createStripeAccountError] - The create stripe account error
  * @param {boolean} [props.fetchInProgress] - Whether the fetch is in progress
- * @param {propTypes.error} [props.fetchStripeAccountError] - The fetch stripe account error
  * @param {Function} [props.getOwnListing] - The get own listing function
- * @param {propTypes.error} props.getAccountLinkError - The get account link error
- * @param {boolean} props.getAccountLinkInProgress - Whether the get account link is in progress
  * @param {Function} props.onFetchExceptions - The on fetch exceptions function
  * @param {Function} props.onAddAvailabilityException - The on add availability exception function
  * @param {Function} props.onDeleteAvailabilityException - The on delete availability exception function
@@ -109,7 +95,6 @@ const pickRenderableImages = (
  * @param {Function} props.onManageDisableScrolling - The on manage disable scrolling function
  * @param {Function} props.onPayoutDetailsChange - The on payout details change function
  * @param {Function} props.onPayoutDetailsSubmit - The on payout details submit function
- * @param {Function} props.onGetStripeConnectAccountLink - The get StripeConnectAccountLink function
  * @param {Object} props.history - The history object
  * @param {Function} props.history.push - The push function
  * @param {Object} props.location - The location object
@@ -120,23 +105,17 @@ const pickRenderableImages = (
  * @param {string} props.params.slug - The slug of the listing
  * @param {string} props.params.tab - The tab of the wizard
  * @param {string} props.params.type - The type of the listing (new, draft, pendingApproval)
- * @param {string} props.params.returnURLType - The return URL type (success or failure for stripe onboarding)
  * @param {boolean} props.scrollingDisabled - Whether the scrolling is disabled
- * @param {boolean} [props.stripeAccountFetched] - Whether the stripe account is fetched
- * @param {Object} [props.stripeAccount] - The stripe account object
- * @param {Object} [props.updateStripeAccountError] - The update stripe account error
+ * @param {boolean} [props.subaccountFetched] - Whether the subaccount is fetched
+ * @param {Object} [props.subaccount] - The subaccount object
  * @returns {JSX.Element}
  */
 export const EditListingPageComponent = props => {
   const intl = useIntl();
   const {
     currentUser,
-    createStripeAccountError,
     fetchInProgress,
-    fetchStripeAccountError,
     getOwnListing,
-    getAccountLinkError,
-    getAccountLinkInProgress,
     history,
     onFetchExceptions,
     onAddAvailabilityException,
@@ -149,18 +128,17 @@ export const EditListingPageComponent = props => {
     onManageDisableScrolling,
     onPayoutDetailsSubmit,
     onPayoutDetailsChange,
-    onGetStripeConnectAccountLink,
     page,
     params,
     location,
     scrollingDisabled,
-    stripeAccountFetched,
-    stripeAccount,
-    updateStripeAccountError,
+    subaccountFetched,
+    subaccount,
     authScopes,
+    createSubaccountError,
   } = props;
 
-  const { id, type, returnURLType } = params;
+  const { id, type } = params;
   const isNewURI = type === LISTING_PAGE_PARAM_TYPE_NEW;
   const isDraftURI = type === LISTING_PAGE_PARAM_TYPE_DRAFT;
   const isNewListingFlow = isNewURI || isDraftURI;
@@ -177,8 +155,7 @@ export const EditListingPageComponent = props => {
   const isPastDraft = currentListingState && currentListingState !== LISTING_STATE_DRAFT;
   const shouldRedirectAfterPosting = isNewListingFlow && listingId && isPastDraft;
 
-  const hasStripeOnboardingDataIfNeeded = returnURLType ? !!currentUser?.id : true;
-  const showWizard = hasStripeOnboardingDataIfNeeded && (isNewURI || currentListing.id);
+  const showWizard = isNewURI || currentListing.id;
 
   if (!isUserAuthorized(currentUser)) {
     return (
@@ -241,7 +218,6 @@ export const EditListingPageComponent = props => {
       showListingsError,
       uploadImageError,
       setStockError,
-      createStripeAccountError,
       addExceptionError,
       deleteExceptionError,
     };
@@ -292,25 +268,20 @@ export const EditListingPageComponent = props => {
           onPublishListingDraft={onPublishListingDraft}
           onPayoutDetailsChange={onPayoutDetailsChange}
           onPayoutDetailsSubmit={onPayoutDetailsSubmit}
-          onGetStripeConnectAccountLink={onGetStripeConnectAccountLink}
-          getAccountLinkInProgress={getAccountLinkInProgress}
           onImageUpload={onImageUpload}
           onRemoveImage={onRemoveListingImage}
           currentUser={currentUser}
           onManageDisableScrolling={onManageDisableScrolling}
-          stripeOnboardingReturnURL={params.returnURLType}
           updatedTab={page.updatedTab}
           updateInProgress={page.updateInProgress || page.createListingDraftInProgress}
           payoutDetailsSaveInProgress={page.payoutDetailsSaveInProgress}
           payoutDetailsSaved={page.payoutDetailsSaved}
-          stripeAccountFetched={stripeAccountFetched}
-          stripeAccount={stripeAccount}
-          stripeAccountError={
-            createStripeAccountError || updateStripeAccountError || fetchStripeAccountError
-          }
-          stripeAccountLinkError={getAccountLinkError}
+          subaccountFetched={subaccountFetched}
+          subaccount={subaccount}
+          flutterwaveSubaccountError={page.payoutDetailsSaveError}
           authScopes={authScopes}
           titleId={titleId}
+          createSubaccountError={createSubaccountError}
         />
       </Page>
     );
@@ -335,15 +306,14 @@ export const EditListingPageComponent = props => {
 const mapStateToProps = state => {
   const page = state.EditListingPage;
   const {
-    getAccountLinkInProgress,
-    getAccountLinkError,
-    createStripeAccountInProgress,
-    createStripeAccountError,
-    updateStripeAccountError,
-    fetchStripeAccountError,
-    stripeAccount,
-    stripeAccountFetched,
-  } = state.stripeConnectAccount;
+    fetchFlutterwaveSubaccountInProgress,
+    fetchFlutterwaveSubaccountError,
+    createFlutterwaveSubaccountInProgress,
+    createSubaccountError,
+    updateFlutterwaveSubaccountError,
+    subaccount,
+    subaccountFetched,
+  } = state.flutterwaveSubaccount;
 
   const getOwnListing = id => {
     const listings = getMarketplaceEntities(state, [{ id, type: 'ownListing' }]);
@@ -353,19 +323,15 @@ const mapStateToProps = state => {
   const { authScopes } = state.auth;
 
   return {
-    getAccountLinkInProgress,
-    getAccountLinkError,
-    createStripeAccountError,
-    updateStripeAccountError,
-    fetchStripeAccountError,
-    stripeAccount,
-    stripeAccountFetched,
+    subaccountFetched,
+    subaccount,
     currentUser: state.user.currentUser,
-    fetchInProgress: createStripeAccountInProgress,
+    fetchInProgress: createFlutterwaveSubaccountInProgress || fetchFlutterwaveSubaccountInProgress,
     getOwnListing,
     page,
     scrollingDisabled: isScrollingDisabled(state),
     authScopes,
+    createSubaccountError,
   };
 };
 
@@ -381,10 +347,9 @@ const mapDispatchToProps = dispatch => ({
     dispatch(requestImageUpload(data, listingImageConfig)),
   onManageDisableScrolling: (componentId, disableScrolling) =>
     dispatch(manageDisableScrolling(componentId, disableScrolling)),
-  onPayoutDetailsChange: () => dispatch(stripeAccountClearError()),
+  onPayoutDetailsChange: () => dispatch(flutterwaveSubaccountClearError()),
   onPayoutDetailsSubmit: (values, isUpdateCall) =>
     dispatch(savePayoutDetails(values, isUpdateCall)),
-  onGetStripeConnectAccountLink: params => dispatch(getStripeConnectAccountLink(params)),
   onRemoveListingImage: imageId => dispatch(removeListingImage(imageId)),
 });
 

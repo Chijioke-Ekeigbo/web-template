@@ -39,6 +39,7 @@ const StripePayoutPage = loadable(() => import(/* webpackChunkName: "StripePayou
 const TermsOfServicePage = loadable(() => import(/* webpackChunkName: "TermsOfServicePage" */ '../containers/TermsOfServicePage/TermsOfServicePage'));
 const TransactionPage = loadable(() => import(/* webpackChunkName: "TransactionPage" */ '../containers/TransactionPage/TransactionPage'));
 const NoAccessPage = loadable(() => import(/* webpackChunkName: "NoAccessPage" */ '../containers/NoAccessPage/NoAccessPage'));
+const PayoutDetailsPage = loadable(() => import(/* webpackChunkName: "PayoutDetailsPage" */ '../containers/PayoutDetailsPage/PayoutDetailsPage'));
 
 // Styleguide helps you to review current components and develop new ones
 const StyleguidePage = loadable(() => import(/* webpackChunkName: "StyleguidePage" */ '../containers/StyleguidePage/StyleguidePage'));
@@ -46,7 +47,7 @@ const StyleguidePage = loadable(() => import(/* webpackChunkName: "StyleguidePag
 export const ACCOUNT_SETTINGS_PAGES = [
   'ContactDetailsPage',
   'PasswordChangePage',
-  'StripePayoutPage',
+  'PayoutDetailsPage',
   'PaymentMethodsPage',
   'ManageAccountPage'
 ];
@@ -330,6 +331,14 @@ const routeConfiguration = (layoutConfig, accessControlConfig) => {
       authPage: 'LoginPage',
       component: StripePayoutPage,
       loadData: pageDataLoadingAPI.StripePayoutPage.loadData,
+    },
+    {
+      path: '/account/payout-details',
+      name: 'PayoutDetailsPage',
+      auth: true,
+      authPage: 'LoginPage',
+      component: PayoutDetailsPage,
+      loadData: pageDataLoadingAPI.PayoutDetailsPage.loadData,
     },
     {
       path: '/account/payments/:returnURLType',
